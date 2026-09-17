@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import Link from "next/link";
 import { verifySession } from "../lib/session";
 import { MODULLER, modulErisimVarMi } from "../lib/moduller";
 import CikisButonu from "./CikisButonu";
@@ -17,34 +18,34 @@ export default async function Kabuk({ aktif, children }) {
     <div className="kabuk">
       <aside className="yan-menu">
         <div className="logo-alan">
-          <a href="/">
+          <Link href="/">
             <img src="/logo.png" alt="Yavuztürk Süleymaniye" />
-          </a>
+          </Link>
         </div>
         <nav>
-          <a href="/" className={aktif === "/" ? "aktif" : ""}>
+          <Link href="/" className={aktif === "/" ? "aktif" : ""}>
             Ana Sayfa
-          </a>
+          </Link>
           {modulLinkleri.map((m) => (
-            <a key={m.href} href={m.href} className={aktif === m.href ? "aktif" : ""}>
+            <Link key={m.href} href={m.href} className={aktif === m.href ? "aktif" : ""}>
               {m.etiket}
               {m.altYazi ? <span className="menu-rozet">{m.altYazi}</span> : null}
-            </a>
+            </Link>
           ))}
           {duzYoklamaVarMi && (
             <>
-              <a href="/istatistik" className={aktif === "/istatistik" ? "aktif" : ""}>
+              <Link href="/istatistik" className={aktif === "/istatistik" ? "aktif" : ""}>
                 İstatistik
-              </a>
-              <a href="/mesaj" className={aktif === "/mesaj" ? "aktif" : ""}>
+              </Link>
+              <Link href="/mesaj" className={aktif === "/mesaj" ? "aktif" : ""}>
                 Veli Bilgilendirme
-              </a>
+              </Link>
             </>
           )}
           {session?.admin && (
-            <a href="/admin" className={aktif === "/admin" ? "aktif" : ""}>
+            <Link href="/admin" className={aktif === "/admin" ? "aktif" : ""}>
               Yönetim
-            </a>
+            </Link>
           )}
         </nav>
         <CikisButonu />

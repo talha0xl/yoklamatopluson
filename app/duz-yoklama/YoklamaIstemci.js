@@ -6,7 +6,13 @@ function bugun() {
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 }
 
-export default function YoklamaIstemci() {
+export default function YoklamaIstemci({ isAdmin }) {
+  const [turler, setTurler] = useState([]);
+  const [turId, setTurId] = useState(null);
+  const [yeniTurAcik, setYeniTurAcik] = useState(false);
+  const [yeniTurAdi, setYeniTurAdi] = useState("");
+  const [turEkleniyor, setTurEkleniyor] = useState(false);
+
   const [gruplar, setGruplar] = useState([]);
   const [grupId, setGrupId] = useState(null);
   const [tarih, setTarih] = useState(bugun());
@@ -15,6 +21,16 @@ export default function YoklamaIstemci() {
   const [acikGelmedi, setAcikGelmedi] = useState({}); // ogrenci_id -> bool
   const [yukleniyor, setYukleniyor] = useState(true);
   const [kaydedenId, setKaydedenId] = useState(null);
+
+  const turleriGetir = useCallback(() => {
+    fetch("/api/yoklama-turleri")
+      .then((r) => r.json())
+      .then((d) => {
+        setTurler(d.turler || []);
+        setTurId((mevcut) => mevcut || d.turler?.[0]?.id || null);
+      });
+  }, []);
+  useEffect(() => turleriGetir(), [turleriGetir]);
 
   useEffect(() => {
     fetch("/api/gruplar")
@@ -26,9 +42,9 @@ export default function YoklamaIstemci() {
   }, []);
 
   const veriGetir = useCallback(() => {
-    if (!grupId || !tarih) return;
+    if (!grupId || !tarih || !turId) return;
     setYukleniyor(true);
-    fetch(`/api/yoklama?grup_id=${grupId}&tarih=${tarih}`)
+    fetch(`/api/yoklama?grup_id=${grupId}&tarih=${tarih}&tur_id=${turId}`)
       .then((r) => r.json())
       .then((d) => {
         setOgrenciler(d.ogrenciler || []);
@@ -38,16 +54,16 @@ export default function YoklamaIstemci() {
         setAcikGelmedi({});
         setYukleniyor(false);
       });
-  }, [grupId, tarih]);
+  }, [grupId, tarih, turId]);
 
-  useEffect(() =>veriGetir(), [veriGetir]);
+  useEffect(() => veriGetir(), [veriGetir]);
 
   async function isaretle(ogrenciId, durum) {
     setKaydedenId(ogrenciId);
     const res = await fetch("/api/yoklama", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ogrenci_id: ogrenciId, tarih, durum }),
+      body: JSON.stringify({ ogrenci_id: ogrenciId, tarih, tur_id: turId, durum }),
     });
     const d = await res.json();
     if (d.kayit) {
@@ -55,6 +71,25 @@ export default function YoklamaIstemci() {
       setAcikGelmedi((a) => ({ ...a, [ogrenciId]: false }));
     }
     setKaydedenId(null);
+  }
+
+  async function yeniTurEkle(e) {
+    e.preventDefault();
+    if (!yeniTurAdi.trim()) return;
+    setTurEkleniyor(true);
+    const res = await fetch("/api/yoklama-turleri", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isim: yeniTurAdi, siralama: turler.length + 1 }),
+    });
+    const d = await res.json();
+    setTurEkleniyor(false);
+    if (d.tur) {
+      setYeniTurAdi("");
+      setYeniTurAcik(false);
+      turleriGetir();
+      setTurId(d.tur.id);
+    }
   }
 
   const gelenSayisi = Object.values(kayitMap).filter((k) => k.durum === "geldi").length;
@@ -75,8 +110,40 @@ export default function YoklamaIstemci() {
           max={bugun()}
         />
       </div>
-      <p className="sayfa-alt">Geldi'ye bastığınızda saat otomatik kaydedilir. Ayrı bir "kaydet" gerekmez.</p>
+      <p className="sayfa-alt">Önce hangi amaçla yoklama aldığınızı seçin, sonra "Geldi"'ye basınca saat otomatik kaydedilir.</p>
 
+      <label className="etiket" style={{ marginBottom: 6, display: "block" }}>Yoklama türü</label>
+      <div className="grup-sekme">
+        {turler.map((t) => (
+          <button key={t.id} className={turId === t.id ? "aktif" : ""} onClick={() => setTurId(t.id)}>
+            {t.isim}
+          </button>
+        ))}
+        {isAdmin && !yeniTurAcik && (
+          <button className="btn-hayalet-sekme" onClick={() => setYeniTurAcik(true)}>
+            + Yeni tür
+          </button>
+        )}
+      </div>
+      {isAdmin && yeniTurAcik && (
+        <form onSubmit={yeniTurEkle} style={{ display: "flex", gap: 8, marginBottom: 16, maxWidth: 360 }}>
+          <input
+            className="girdi"
+            autoFocus
+            placeholder="Örn. Pazar İzin Dönüşü"
+            value={yeniTurAdi}
+            onChange={(e) => setYeniTurAdi(e.target.value)}
+          />
+          <button className="btn btn-lacivert btn-sm" disabled={turEkleniyor}>
+            Ekle
+          </button>
+          <button type="button" className="btn btn-hayalet btn-sm" onClick={() => setYeniTurAcik(false)}>
+            Vazgeç
+          </button>
+        </form>
+      )}
+
+      <label className="etiket" style={{ marginBottom: 6, display: "block" }}>Grup</label>
       <div className="grup-sekme">
         {gruplar.map((g) => (
           <button key={g.id} className={grupId === g.id ? "aktif" : ""} onClick={() => setGrupId(g.id)}>

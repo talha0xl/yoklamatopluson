@@ -1,8 +1,78 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { verifySession } from "../lib/session";
 import { MODULLER, modulErisimVarMi } from "../lib/moduller";
+import { supabaseServer } from "../lib/supabaseServer";
 import Kabuk from "../components/Kabuk";
+
+function bugun() {
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+
+async function ozetVerileriGetir(session) {
+  const supabase = supabaseServer();
+  const tarih = bugun();
+  const ozet = { yoklama: null, namaz: null, gorev: null };
+
+  try {
+    if (modulErisimVarMi(session, "duz_yoklama")) {
+      const { count: toplamOgrenci } = await supabase
+        .from("ogrenciler")
+        .select("id", { count: "exact", head: true })
+        .eq("aktif", true);
+      const { data: tur } = await supabase
+        .from("yoklama_turleri")
+        .select("id")
+        .eq("isim", "Günlük Yoklama")
+        .maybeSingle();
+      if (tur && toplamOgrenci) {
+        const { count: geldi } = await supabase
+          .from("yoklama")
+          .select("id", { count: "exact", head: true })
+          .eq("tarih", tarih)
+          .eq("tur_id", tur.id)
+          .eq("durum", "geldi");
+        ozet.yoklama = { geldi: geldi || 0, toplam: toplamOgrenci };
+      }
+    }
+  } catch {}
+
+  try {
+    if (modulErisimVarMi(session, "namaz_yoklama")) {
+      const { count: toplamOgrenci } = await supabase
+        .from("ogrenciler")
+        .select("id", { count: "exact", head: true })
+        .eq("aktif", true);
+      if (toplamOgrenci) {
+        const { count: kildi } = await supabase
+          .from("namaz_yoklama")
+          .select("id", { count: "exact", head: true })
+          .eq("tarih", tarih)
+          .eq("durum", "kildi");
+        ozet.namaz = { kildi: kildi || 0, toplamMumkun: toplamOgrenci * 5 };
+      }
+    }
+  } catch {}
+
+  try {
+    if (modulErisimVarMi(session, "gorev_listeleri")) {
+      const { count: toplamKisi } = await supabase
+        .from("gorev_kisileri")
+        .select("id", { count: "exact", head: true })
+        .eq("aktif", true);
+      const { count: yapildi } = await supabase
+        .from("gorev_kayitlari")
+        .select("id", { count: "exact", head: true })
+        .eq("tarih", tarih)
+        .eq("yapildi", true);
+      if (toplamKisi) ozet.gorev = { yapildi: yapildi || 0, toplam: toplamKisi };
+    }
+  } catch {}
+
+  return ozet;
+}
 
 export default async function Anasayfa() {
   const token = cookies().get("yt_session")?.value;
@@ -12,6 +82,8 @@ export default async function Anasayfa() {
   const gorulebilirModuller = MODULLER.filter(
     (m) => (m.hazir || session.admin) && modulErisimVarMi(session, m.anahtar)
   );
+  const ozet = await ozetVerileriGetir(session);
+  const ozetVarMi = ozet.yoklama || ozet.namaz || ozet.gorev;
 
   return (
     <Kabuk aktif="/">
@@ -23,18 +95,8 @@ export default async function Anasayfa() {
       <div className="modul-izgara">
         {gorulebilirModuller.map((m) => {
           const pasif = !m.hazir;
-          const Etiket = pasif ? "div" : "a";
           return (
-            <Etiket key={m.anahtar} href={pasif ? undefined : m.yol} className={`modul-kart ${pasif ? "modul-pasif" : ""}`}>
-              <div className="modul-simge">
-                <ModulSimgesi anahtar={m.anahtar} />
-              </div>
-              <div className="modul-baslik">
-                {m.isim}
-                {pasif && <span className="rozet rozet-gri">Yapım aşamasında</span>}
-              </div>
-              <div className="modul-aciklama">{m.aciklama}</div>
-            </Etiket>
+            <ModulKart key={m.anahtar} modul={m} pasif={pasif} />
           );
         })}
         {gorulebilirModuller.length === 0 && (
@@ -43,7 +105,71 @@ export default async function Anasayfa() {
           </div>
         )}
       </div>
+
+      {ozetVarMi && (
+        <>
+          <div className="ozet-baslik">Bugünün özeti</div>
+          <div className="ozet-izgara">
+            {ozet.yoklama && (
+              <OzetKart
+                deger={`${ozet.yoklama.geldi} / ${ozet.yoklama.toplam}`}
+                etiket="Bugün Yurt Yoklama'da geldi"
+                oran={ozet.yoklama.toplam ? Math.round((ozet.yoklama.geldi / ozet.yoklama.toplam) * 100) : 0}
+              />
+            )}
+            {ozet.namaz && (
+              <OzetKart
+                deger={`%${ozet.namaz.toplamMumkun ? Math.round((ozet.namaz.kildi / ozet.namaz.toplamMumkun) * 100) : 0}`}
+                etiket="Bugün namaz tamamlanma oranı"
+                oran={ozet.namaz.toplamMumkun ? Math.round((ozet.namaz.kildi / ozet.namaz.toplamMumkun) * 100) : 0}
+              />
+            )}
+            {ozet.gorev && (
+              <OzetKart
+                deger={`${ozet.gorev.yapildi} / ${ozet.gorev.toplam}`}
+                etiket="Bugün görev listelerinde tamamlanan"
+                oran={ozet.gorev.toplam ? Math.round((ozet.gorev.yapildi / ozet.gorev.toplam) * 100) : 0}
+              />
+            )}
+          </div>
+        </>
+      )}
     </Kabuk>
+  );
+}
+
+function OzetKart({ deger, etiket, oran }) {
+  return (
+    <div className="ozet-kart">
+      <div className="ozet-deger">{deger}</div>
+      <div className="ozet-etiket">{etiket}</div>
+      <div className="ozet-cubuk-sarma">
+        <div className="ozet-cubuk" style={{ width: `${Math.min(100, Math.max(0, oran))}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function ModulKart({ modul, pasif }) {
+  const icerik = (
+    <>
+      <div className="modul-simge">
+        <ModulSimgesi anahtar={modul.anahtar} />
+      </div>
+      <div className="modul-baslik">
+        {modul.isim}
+        {pasif && <span className="rozet rozet-gri">Yapım aşamasında</span>}
+      </div>
+      <div className="modul-aciklama">{modul.aciklama}</div>
+    </>
+  );
+  if (pasif) {
+    return <div className={`modul-kart modul-pasif`}>{icerik}</div>;
+  }
+  return (
+    <Link href={modul.yol} className="modul-kart">
+      {icerik}
+    </Link>
   );
 }
 

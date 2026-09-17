@@ -27,16 +27,30 @@ create table if not exists ogrenciler (
   created_at timestamptz not null default now()
 );
 
+-- Yoklama türleri: "Günlük Yoklama" varsayılan olarak gelir, istediğiniz
+-- kadar yeni tür ekleyebilirsiniz (örn. "Pazar İzin Dönüşü") — aynı gün
+-- için birden fazla türde yoklama tutulabilir.
+create table if not exists yoklama_turleri (
+  id uuid primary key default gen_random_uuid(),
+  isim text not null unique,
+  siralama int not null default 0,
+  aktif boolean not null default true,
+  created_at timestamptz not null default now()
+);
+insert into yoklama_turleri (isim, siralama) values ('Günlük Yoklama', 1)
+on conflict (isim) do nothing;
+
 create table if not exists yoklama (
   id uuid primary key default gen_random_uuid(),
   ogrenci_id uuid not null references ogrenciler(id) on delete cascade,
+  tur_id uuid not null references yoklama_turleri(id),
   tarih date not null default current_date,
   durum text not null check (durum in ('geldi', 'izinli', 'izinsiz')),
   saat time not null default current_time,
   not_metni text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  unique (ogrenci_id, tarih)
+  unique (ogrenci_id, tarih, tur_id)
 );
 
 create table if not exists erisim_kodlari (
@@ -62,6 +76,7 @@ on conflict (kod) do nothing;
 
 alter table gruplar enable row level security;
 alter table ogrenciler enable row level security;
+alter table yoklama_turleri enable row level security;
 alter table yoklama enable row level security;
 alter table erisim_kodlari enable row level security;
 -- Bu 4 tabloya public policy yok: sadece sunucu (service role) erişir.

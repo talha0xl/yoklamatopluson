@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { supabaseServer } from "../../../lib/supabaseServer";
 
-// GET /api/yoklama?grup_id=...&tarih=2026-08-12
+// GET /api/yoklama?grup_id=...&tarih=2026-08-12&tur_id=...
 export async function GET(req) {
   const grupId = req.nextUrl.searchParams.get("grup_id");
   const tarih = req.nextUrl.searchParams.get("tarih");
+  const turId = req.nextUrl.searchParams.get("tur_id");
   const supabase = supabaseServer();
 
   let ogrenciQ = supabase.from("ogrenciler").select("*").eq("aktif", true).order("ad_soyad");
@@ -14,11 +15,12 @@ export async function GET(req) {
 
   const ids = ogrenciler.map((o) => o.id);
   let kayitlar = [];
-  if (ids.length && tarih) {
+  if (ids.length && tarih && turId) {
     const { data, error: e2 } = await supabase
       .from("yoklama")
       .select("*")
       .eq("tarih", tarih)
+      .eq("tur_id", turId)
       .in("ogrenci_id", ids);
     if (e2) return NextResponse.json({ error: e2.message }, { status: 500 });
     kayitlar = data;
@@ -27,7 +29,7 @@ export async function GET(req) {
   return NextResponse.json({ ogrenciler, kayitlar });
 }
 
-// POST { ogrenci_id, tarih, durum }  -> tek tık, anında kayıt (upsert)
+// POST { ogrenci_id, tarih, tur_id, durum }  -> tek tık, anında kayıt (upsert)
 export async function POST(req) {
   const body = await req.json();
   const supabase = supabaseServer();
@@ -40,11 +42,12 @@ export async function POST(req) {
       {
         ogrenci_id: body.ogrenci_id,
         tarih: body.tarih,
+        tur_id: body.tur_id,
         durum: body.durum,
         saat,
         updated_at: now.toISOString(),
       },
-      { onConflict: "ogrenci_id,tarih" }
+      { onConflict: "ogrenci_id,tarih,tur_id" }
     )
     .select()
     .single();
@@ -53,12 +56,18 @@ export async function POST(req) {
   return NextResponse.json({ kayit: data });
 }
 
-// DELETE /api/yoklama?ogrenci_id=...&tarih=...  (işaretlemeyi geri al)
+// DELETE /api/yoklama?ogrenci_id=...&tarih=...&tur_id=...  (işaretlemeyi geri al)
 export async function DELETE(req) {
   const ogrenciId = req.nextUrl.searchParams.get("ogrenci_id");
   const tarih = req.nextUrl.searchParams.get("tarih");
+  const turId = req.nextUrl.searchParams.get("tur_id");
   const supabase = supabaseServer();
-  const { error } = await supabase.from("yoklama").delete().eq("ogrenci_id", ogrenciId).eq("tarih", tarih);
+  const { error } = await supabase
+    .from("yoklama")
+    .delete()
+    .eq("ogrenci_id", ogrenciId)
+    .eq("tarih", tarih)
+    .eq("tur_id", turId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

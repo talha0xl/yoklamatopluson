@@ -10,7 +10,17 @@ function ayBasi() {
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-01";
 }
 
+const KAYNAKLAR = [
+  { anahtar: "yoklama", isim: "Yurt Yoklama" },
+  { anahtar: "namaz", isim: "Namaz Yoklama" },
+];
+
 export default function IstatistikIstemci() {
+  const [kaynak, setKaynak] = useState("yoklama");
+
+  const [turler, setTurler] = useState([]);
+  const [turId, setTurId] = useState(null);
+
   const [gruplar, setGruplar] = useState([]);
   const [grupId, setGrupId] = useState(null);
   const [baslangic, setBaslangic] = useState(ayBasi());
@@ -25,18 +35,27 @@ export default function IstatistikIstemci() {
         setGruplar(d.gruplar || []);
         if (d.gruplar?.length) setGrupId(d.gruplar[0].id);
       });
+    fetch("/api/yoklama-turleri")
+      .then((r) => r.json())
+      .then((d) => {
+        setTurler(d.turler || []);
+        setTurId((mevcut) => mevcut || d.turler?.[0]?.id || null);
+      });
   }, []);
 
   const getir = useCallback(() => {
     if (!grupId) return;
+    if (kaynak === "yoklama" && !turId) return;
     setYukleniyor(true);
-    fetch(`/api/istatistik?grup_id=${grupId}&baslangic=${baslangic}&bitis=${bitis}`)
+    const params = new URLSearchParams({ kaynak, grup_id: grupId, baslangic, bitis });
+    if (kaynak === "yoklama") params.set("tur_id", turId);
+    fetch(`/api/istatistik?${params.toString()}`)
       .then((r) => r.json())
       .then((d) => {
         setSonuc(d.sonuc || []);
         setYukleniyor(false);
       });
-  }, [grupId, baslangic, bitis]);
+  }, [kaynak, grupId, turId, baslangic, bitis]);
 
   useEffect(() => getir(), [getir]);
 
@@ -44,13 +63,40 @@ export default function IstatistikIstemci() {
   const genelGeldi = sonuc.reduce((a, s) => a + s.geldi, 0);
   const genelOran = genelToplam ? Math.round((genelGeldi / genelToplam) * 100) : null;
 
+  const basliklar =
+    kaynak === "namaz"
+      ? { ilk: "Kıldı", ikinci: null, ucuncu: "Kılmadı", oranEtiket: "Kılma oranı" }
+      : { ilk: "Geldi", ikinci: "İzinli", ucuncu: "İzinsiz", oranEtiket: "Devam oranı" };
+
   return (
     <>
       <div className="sayfa-baslik">
         <h1>İstatistik</h1>
       </div>
-      <p className="sayfa-alt">Seçtiğiniz tarih aralığında grup devam durumu.</p>
+      <p className="sayfa-alt">Neyin istatistiğini görmek istediğinizi seçin, sonra tarih aralığını daraltın.</p>
 
+      <div className="grup-sekme">
+        {KAYNAKLAR.map((k) => (
+          <button key={k.anahtar} className={kaynak === k.anahtar ? "aktif" : ""} onClick={() => setKaynak(k.anahtar)}>
+            {k.isim}
+          </button>
+        ))}
+      </div>
+
+      {kaynak === "yoklama" && turler.length > 1 && (
+        <>
+          <label className="etiket" style={{ marginBottom: 6, display: "block" }}>Yoklama türü</label>
+          <div className="grup-sekme">
+            {turler.map((t) => (
+              <button key={t.id} className={turId === t.id ? "aktif" : ""} onClick={() => setTurId(t.id)}>
+                {t.isim}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      <label className="etiket" style={{ marginBottom: 6, display: "block" }}>Grup</label>
       <div className="grup-sekme">
         {gruplar.map((g) => (
           <button key={g.id} className={grupId === g.id ? "aktif" : ""} onClick={() => setGrupId(g.id)}>
@@ -71,7 +117,7 @@ export default function IstatistikIstemci() {
           </div>
           {genelOran !== null && (
             <div style={{ marginLeft: "auto", textAlign: "right" }}>
-              <div style={{ fontSize: 13, color: "var(--metin-soluk)" }}>Genel devam oranı</div>
+              <div style={{ fontSize: 13, color: "var(--metin-soluk)" }}>Genel {basliklar.oranEtiket.toLocaleLowerCase("tr")}</div>
               <div style={{ fontSize: 26, fontWeight: 800, color: "var(--lacivert)" }}>%{genelOran}</div>
             </div>
           )}
@@ -87,10 +133,10 @@ export default function IstatistikIstemci() {
               <thead>
                 <tr>
                   <th>Öğrenci</th>
-                  <th>Geldi</th>
-                  <th>İzinli</th>
-                  <th>İzinsiz</th>
-                  <th style={{ width: 160 }}>Devam oranı</th>
+                  <th>{basliklar.ilk}</th>
+                  {basliklar.ikinci && <th>{basliklar.ikinci}</th>}
+                  <th>{basliklar.ucuncu}</th>
+                  <th style={{ width: 160 }}>{basliklar.oranEtiket}</th>
                 </tr>
               </thead>
               <tbody>
@@ -98,7 +144,7 @@ export default function IstatistikIstemci() {
                   <tr key={s.ogrenci.id}>
                     <td style={{ fontWeight: 600 }}>{s.ogrenci.ad_soyad}</td>
                     <td>{s.geldi}</td>
-                    <td>{s.izinli}</td>
+                    {basliklar.ikinci && <td>{s.izinli}</td>}
                     <td>{s.izinsiz}</td>
                     <td>
                       {s.oran === null ? (
