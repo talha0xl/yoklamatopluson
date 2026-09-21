@@ -15,63 +15,109 @@ function whatsappNumarasi(tel) {
   return t;
 }
 
-const VARSAYILAN_SABLON =
-  "Sayın {veli}, {ogrenci} adlı öğrencimizin {tarih} tarihli yurt yoklama durumu: {durum}. Bilginize sunarız. Yavuztürk Süleymaniye Yurdu";
+const KAYNAKLAR = [
+  { anahtar: "yoklama", isim: "Yurt Yoklama" },
+  { anahtar: "namaz", isim: "Namaz Yoklama" },
+];
 
-export default function MesajIstemci() {
-  const [gruplar, setGruplar] = useState([]);
-  const [grupId, setGrupId] = useState(null);
+const VAKIT_ETIKET = { sabah: "Sabah", ogle: "Öğle", ikindi: "İkindi", aksam: "Akşam", yatsi: "Yatsı" };
+const VAKIT_SIRA = ["sabah", "ogle", "ikindi", "aksam", "yatsi"];
+const NAMAZ_DURUM_ETIKET = { kildi: "Kıldı", gec_kildi: "Geç Kıldı", kilmadi: "Kılmadı" };
+
+const VARSAYILAN_SABLON_YOKLAMA =
+  "Sayın {veli}, {ogrenci} adlı öğrencimizin {tarih} tarihli {tur} durumu: {durum}. Bilginize sunarız. Yavuztürk Süleymaniye Yurdu";
+const VARSAYILAN_SABLON_NAMAZ =
+  "Sayın {veli}, {ogrenci} adlı öğrencimizin {tarih} tarihli namaz durumu: {durum}. Bilginize sunarız. Yavuztürk Süleymaniye Yurdu";
+
+export default function MesajIstemci({ baslangicGruplar, baslangicTurler }) {
+  const [kaynak, setKaynak] = useState("yoklama");
+  const [gruplar] = useState(baslangicGruplar || []);
+  const [grupId, setGrupId] = useState(baslangicGruplar?.[0]?.id || null);
+  const [turler] = useState(baslangicTurler || []);
+  const [turId, setTurId] = useState(baslangicTurler?.[0]?.id || null);
   const [tarih, setTarih] = useState(bugun());
   const [durumFiltre, setDurumFiltre] = useState("izinsiz");
-  const [sablon, setSablon] = useState(VARSAYILAN_SABLON);
+  const [sablon, setSablon] = useState(VARSAYILAN_SABLON_YOKLAMA);
+  const [sablonElleDegisti, setSablonElleDegisti] = useState(false);
   const [ogrenciler, setOgrenciler] = useState([]);
-  const [kayitMap, setKayitMap] = useState({});
+  const [kayitMap, setKayitMap] = useState({}); // yoklama: ogrenci_id -> kayit | namaz: ogrenci_id -> [kayitlar]
   const [yukleniyor, setYukleniyor] = useState(true);
 
+  // Kaynak değişince filtre ve şablonu o kaynağa uygun varsayılana çek
   useEffect(() => {
-    fetch("/api/gruplar")
-      .then((r) => r.json())
-      .then((d) => {
-        setGruplar(d.gruplar || []);
-        if (d.gruplar?.length) setGrupId(d.gruplar[0].id);
-      });
-  }, []);
+    setDurumFiltre(kaynak === "namaz" ? "kilmadi" : "izinsiz");
+    if (!sablonElleDegisti) setSablon(kaynak === "namaz" ? VARSAYILAN_SABLON_NAMAZ : VARSAYILAN_SABLON_YOKLAMA);
+  }, [kaynak]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const getir = useCallback(() => {
     if (!grupId) return;
+    if (kaynak === "yoklama" && !turId) return;
     setYukleniyor(true);
-    fetch(`/api/yoklama?grup_id=${grupId}&tarih=${tarih}`)
-      .then((r) => r.json())
-      .then((d) => {
-        setOgrenciler(d.ogrenciler || []);
-        const map = {};
-        (d.kayitlar || []).forEach((k) => (map[k.ogrenci_id] = k));
-        setKayitMap(map);
-        setYukleniyor(false);
-      });
-  }, [grupId, tarih]);
+    if (kaynak === "namaz") {
+      fetch(`/api/namaz-yoklama?grup_id=${grupId}&tarih=${tarih}`)
+        .then((r) => r.json())
+        .then((d) => {
+          setOgrenciler(d.ogrenciler || []);
+          const map = {};
+          (d.kayitlar || []).forEach((k) => {
+            if (!map[k.ogrenci_id]) map[k.ogrenci_id] = [];
+            map[k.ogrenci_id].push(k);
+          });
+          setKayitMap(map);
+          setYukleniyor(false);
+        });
+    } else {
+      fetch(`/api/yoklama?grup_id=${grupId}&tarih=${tarih}&tur_id=${turId}`)
+        .then((r) => r.json())
+        .then((d) => {
+          setOgrenciler(d.ogrenciler || []);
+          const map = {};
+          (d.kayitlar || []).forEach((k) => (map[k.ogrenci_id] = k));
+          setKayitMap(map);
+          setYukleniyor(false);
+        });
+    }
+  }, [kaynak, grupId, turId, tarih]);
 
   useEffect(() => getir(), [getir]);
 
   const seciliGrup = gruplar.find((g) => g.id === grupId);
   const grupKapali = seciliGrup && seciliGrup.veli_bilgilendirme_aktif === false;
+  const seciliTur = turler.find((t) => t.id === turId);
 
-  const durumEtiket = { geldi: "Geldi", izinli: "İzinli", izinsiz: "İzinsiz" };
+  const durumEtiketYoklama = { geldi: "Geldi", izinli: "İzinli", izinsiz: "İzinsiz" };
+
+  function namazOzeti(kayitlar) {
+    if (!kayitlar || kayitlar.length === 0) return "İşaretlenmedi";
+    return VAKIT_SIRA.filter((v) => kayitlar.some((k) => k.vakit === v))
+      .map((v) => {
+        const k = kayitlar.find((kk) => kk.vakit === v);
+        return `${VAKIT_ETIKET[v]}: ${NAMAZ_DURUM_ETIKET[k.durum] || k.durum}`;
+      })
+      .join(", ");
+  }
 
   const hedefListe = ogrenciler
     .filter((o) => o.veli_telefon)
     .map((o) => ({ ogrenci: o, kayit: kayitMap[o.id] }))
     .filter(({ kayit }) => {
+      if (kaynak === "namaz") {
+        const kayitlar = kayit || [];
+        if (durumFiltre === "hepsi") return kayitlar.length > 0;
+        return kayitlar.some((k) => k.durum === durumFiltre);
+      }
       if (durumFiltre === "hepsi") return true;
       return kayit?.durum === durumFiltre;
     });
 
   function mesajUret(ogrenci, kayit) {
+    const durumMetni = kaynak === "namaz" ? namazOzeti(kayit) : kayit ? durumEtiketYoklama[kayit.durum] : "İşaretlenmedi";
     return sablon
       .replaceAll("{veli}", ogrenci.veli_adi || "Veli")
       .replaceAll("{ogrenci}", ogrenci.ad_soyad)
       .replaceAll("{tarih}", tarih.split("-").reverse().join("."))
-      .replaceAll("{durum}", kayit ? durumEtiket[kayit.durum] : "İşaretlenmedi");
+      .replaceAll("{tur}", seciliTur?.isim || "yoklama")
+      .replaceAll("{durum}", durumMetni);
   }
 
   return (
@@ -80,9 +126,30 @@ export default function MesajIstemci() {
         <h1>Veli Bilgilendirme</h1>
       </div>
       <p className="sayfa-alt">
-        Her veli için hazır mesajla WhatsApp'ı açan bir bağlantı üretir; gönder'e siz basarsınız. Tamamen otomatik
-        toplu gönderim için WhatsApp Business API başvurusu gerekir (Yönetim sayfasında not var).
+        Önce hangi konuda mesaj göndereceğinizi seçin. Her veli için hazır mesajla WhatsApp'ı açan bir bağlantı üretir;
+        gönder'e siz basarsınız.
       </p>
+
+      <div className="grup-sekme">
+        {KAYNAKLAR.map((k) => (
+          <button key={k.anahtar} className={kaynak === k.anahtar ? "aktif" : ""} onClick={() => setKaynak(k.anahtar)}>
+            {k.isim}
+          </button>
+        ))}
+      </div>
+
+      {kaynak === "yoklama" && turler.length > 1 && (
+        <>
+          <label className="etiket" style={{ marginBottom: 6, display: "block" }}>Hangi yoklama türü</label>
+          <div className="grup-sekme">
+            {turler.map((t) => (
+              <button key={t.id} className={turId === t.id ? "aktif" : ""} onClick={() => setTurId(t.id)}>
+                {t.isim}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       <div className="grup-sekme">
         {gruplar.map((g) => (
@@ -108,18 +175,35 @@ export default function MesajIstemci() {
                 </div>
                 <div>
                   <label className="etiket">Kimlere gönderilsin</label>
-                  <select className="girdi" value={durumFiltre} onChange={(e) => setDurumFiltre(e.target.value)}>
-                    <option value="izinsiz">Sadece izinsiz olanlar</option>
-                    <option value="izinli">Sadece izinli olanlar</option>
-                    <option value="geldi">Sadece gelenler</option>
-                    <option value="hepsi">Bugün işaretlenen herkes</option>
-                  </select>
+                  {kaynak === "namaz" ? (
+                    <select className="girdi" value={durumFiltre} onChange={(e) => setDurumFiltre(e.target.value)}>
+                      <option value="kilmadi">En az bir vakti kılmayanlar</option>
+                      <option value="gec_kildi">Geç kılanı olanlar</option>
+                      <option value="hepsi">Bugün işaretlenen herkes</option>
+                    </select>
+                  ) : (
+                    <select className="girdi" value={durumFiltre} onChange={(e) => setDurumFiltre(e.target.value)}>
+                      <option value="izinsiz">Sadece izinsiz olanlar</option>
+                      <option value="izinli">Sadece izinli olanlar</option>
+                      <option value="geldi">Sadece gelenler</option>
+                      <option value="hepsi">Bugün işaretlenen herkes</option>
+                    </select>
+                  )}
                 </div>
               </div>
               <label className="etiket">Mesaj şablonu</label>
-              <textarea className="girdi" rows={3} value={sablon} onChange={(e) => setSablon(e.target.value)} />
+              <textarea
+                className="girdi"
+                rows={3}
+                value={sablon}
+                onChange={(e) => {
+                  setSablon(e.target.value);
+                  setSablonElleDegisti(true);
+                }}
+              />
               <div style={{ fontSize: 12.5, color: "var(--metin-soluk)", marginTop: 6 }}>
                 Kullanabileceğiniz alanlar: {"{veli}"}, {"{ogrenci}"}, {"{tarih}"}, {"{durum}"}
+                {kaynak === "yoklama" && <> , {"{tur}"}</>}
               </div>
             </div>
           </div>

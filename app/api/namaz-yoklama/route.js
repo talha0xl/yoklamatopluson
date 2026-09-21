@@ -49,3 +49,19 @@ export async function POST(req) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ kayit: data });
 }
+
+// DELETE /api/namaz-yoklama?ogrenci_id=...&tarih=...&vakit=...  (işaretlemeyi geri al)
+export async function DELETE(req) {
+  const ogrenciId = req.nextUrl.searchParams.get("ogrenci_id");
+  const tarih = req.nextUrl.searchParams.get("tarih");
+  const vakit = req.nextUrl.searchParams.get("vakit");
+  const supabase = supabaseServer();
+  const { error } = await supabase
+    .from("namaz_yoklama")
+    .delete()
+    .eq("ogrenci_id", ogrenciId)
+    .eq("tarih", tarih)
+    .eq("vakit", vakit);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}

@@ -15,33 +15,18 @@ const KAYNAKLAR = [
   { anahtar: "namaz", isim: "Namaz Yoklama" },
 ];
 
-export default function IstatistikIstemci() {
+export default function IstatistikIstemci({ baslangicGruplar, baslangicTurler }) {
   const [kaynak, setKaynak] = useState("yoklama");
 
-  const [turler, setTurler] = useState([]);
-  const [turId, setTurId] = useState(null);
+  const [turler] = useState(baslangicTurler || []);
+  const [turId, setTurId] = useState(baslangicTurler?.[0]?.id || null);
 
-  const [gruplar, setGruplar] = useState([]);
-  const [grupId, setGrupId] = useState(null);
+  const [gruplar] = useState(baslangicGruplar || []);
+  const [grupId, setGrupId] = useState(baslangicGruplar?.[0]?.id || null);
   const [baslangic, setBaslangic] = useState(ayBasi());
   const [bitis, setBitis] = useState(bugun());
   const [sonuc, setSonuc] = useState([]);
   const [yukleniyor, setYukleniyor] = useState(true);
-
-  useEffect(() => {
-    fetch("/api/gruplar")
-      .then((r) => r.json())
-      .then((d) => {
-        setGruplar(d.gruplar || []);
-        if (d.gruplar?.length) setGrupId(d.gruplar[0].id);
-      });
-    fetch("/api/yoklama-turleri")
-      .then((r) => r.json())
-      .then((d) => {
-        setTurler(d.turler || []);
-        setTurId((mevcut) => mevcut || d.turler?.[0]?.id || null);
-      });
-  }, []);
 
   const getir = useCallback(() => {
     if (!grupId) return;
@@ -65,7 +50,7 @@ export default function IstatistikIstemci() {
 
   const basliklar =
     kaynak === "namaz"
-      ? { ilk: "Kıldı", ikinci: null, ucuncu: "Kılmadı", oranEtiket: "Kılma oranı" }
+      ? { ilk: "Kıldı", ikinci: "Geç Kıldı", ucuncu: "Kılmadı", oranEtiket: "Kılma oranı" }
       : { ilk: "Geldi", ikinci: "İzinli", ucuncu: "İzinsiz", oranEtiket: "Devam oranı" };
 
   return (

@@ -6,15 +6,15 @@ function bugun() {
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 }
 
-export default function YoklamaIstemci({ isAdmin }) {
-  const [turler, setTurler] = useState([]);
-  const [turId, setTurId] = useState(null);
+export default function YoklamaIstemci({ isAdmin, baslangicTurler, baslangicGruplar }) {
+  const [turler, setTurler] = useState(baslangicTurler || []);
+  const [turId, setTurId] = useState(baslangicTurler?.[0]?.id || null);
   const [yeniTurAcik, setYeniTurAcik] = useState(false);
   const [yeniTurAdi, setYeniTurAdi] = useState("");
   const [turEkleniyor, setTurEkleniyor] = useState(false);
 
-  const [gruplar, setGruplar] = useState([]);
-  const [grupId, setGrupId] = useState(null);
+  const [gruplar] = useState(baslangicGruplar || []);
+  const [grupId, setGrupId] = useState(baslangicGruplar?.[0]?.id || null);
   const [tarih, setTarih] = useState(bugun());
   const [ogrenciler, setOgrenciler] = useState([]);
   const [kayitMap, setKayitMap] = useState({}); // ogrenci_id -> {durum, saat}
@@ -28,16 +28,6 @@ export default function YoklamaIstemci({ isAdmin }) {
       .then((d) => {
         setTurler(d.turler || []);
         setTurId((mevcut) => mevcut || d.turler?.[0]?.id || null);
-      });
-  }, []);
-  useEffect(() => turleriGetir(), [turleriGetir]);
-
-  useEffect(() => {
-    fetch("/api/gruplar")
-      .then((r) => r.json())
-      .then((d) => {
-        setGruplar(d.gruplar || []);
-        if (d.gruplar?.length) setGrupId(d.gruplar[0].id);
       });
   }, []);
 
@@ -70,6 +60,18 @@ export default function YoklamaIstemci({ isAdmin }) {
       setKayitMap((m) => ({ ...m, [ogrenciId]: d.kayit }));
       setAcikGelmedi((a) => ({ ...a, [ogrenciId]: false }));
     }
+    setKaydedenId(null);
+  }
+
+  async function isaretiSil(ogrenciId) {
+    setKaydedenId(ogrenciId);
+    await fetch(`/api/yoklama?ogrenci_id=${ogrenciId}&tarih=${tarih}&tur_id=${turId}`, { method: "DELETE" });
+    setKayitMap((m) => {
+      const yeni = { ...m };
+      delete yeni[ogrenciId];
+      return yeni;
+    });
+    setAcikGelmedi((a) => ({ ...a, [ogrenciId]: false }));
     setKaydedenId(null);
   }
 
@@ -200,6 +202,16 @@ export default function YoklamaIstemci({ isAdmin }) {
                       >
                         {durum === "izinli" ? "İzinli" : durum === "izinsiz" ? "İzinsiz" : "Gelmedi"}
                       </button>
+                      {durum && (
+                        <button
+                          className="btn btn-hayalet btn-sm"
+                          title="İşareti sil"
+                          disabled={kaydedenId === o.id}
+                          onClick={() => isaretiSil(o.id)}
+                        >
+                          Sıfırla
+                        </button>
+                      )}
                     </div>
                   )}
                   {gelmediAcik && (

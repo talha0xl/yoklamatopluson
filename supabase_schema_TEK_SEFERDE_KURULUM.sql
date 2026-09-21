@@ -112,7 +112,7 @@ create table if not exists namaz_yoklama (
   ogrenci_id uuid not null references ogrenciler(id) on delete cascade,
   tarih date not null default current_date,
   vakit text not null check (vakit in ('sabah','ogle','ikindi','aksam','yatsi')),
-  durum text not null check (durum in ('kildi','kilmadi')),
+  durum text not null check (durum in ('kildi','gec_kildi','kilmadi')),
   not_metni text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -124,12 +124,23 @@ create table if not exists gorev_listeleri (
   id uuid primary key default gen_random_uuid(),
   isim text not null unique,
   siralama int not null default 0,
+  vakit_bazli boolean not null default false,
   created_at timestamptz not null default now()
+);
+
+create table if not exists gorev_gruplari (
+  id uuid primary key default gen_random_uuid(),
+  liste_id uuid not null references gorev_listeleri(id) on delete cascade,
+  isim text not null,
+  siralama int not null default 0,
+  created_at timestamptz not null default now(),
+  unique (liste_id, isim)
 );
 
 create table if not exists gorev_kisileri (
   id uuid primary key default gen_random_uuid(),
   liste_id uuid not null references gorev_listeleri(id) on delete cascade,
+  grup_id uuid references gorev_gruplari(id) on delete set null,
   ad_soyad text not null,
   sira int not null default 0,
   aktif boolean not null default true,
@@ -141,19 +152,33 @@ create table if not exists gorev_kayitlari (
   liste_id uuid not null references gorev_listeleri(id) on delete cascade,
   kisi_id uuid not null references gorev_kisileri(id) on delete cascade,
   tarih date not null default current_date,
+  vakit text not null default 'gun' check (vakit in ('gun','sabah','ogle','ikindi','aksam','yatsi')),
   yapildi boolean not null default false,
   not_metni text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  unique (kisi_id, tarih)
+  unique (kisi_id, tarih, vakit)
 );
 alter table gorev_listeleri enable row level security;
+alter table gorev_gruplari enable row level security;
 alter table gorev_kisileri enable row level security;
 alter table gorev_kayitlari enable row level security;
 
-insert into gorev_listeleri (isim, siralama) values
-  ('Yemekçilik', 1), ('Müezzinlik', 2), ('Nöbetçi', 3)
+insert into gorev_listeleri (isim, siralama, vakit_bazli) values
+  ('Yemekçilik', 1, false), ('Müezzinlik', 2, true), ('Nöbetçi', 3, false)
 on conflict (isim) do nothing;
+
+create index if not exists idx_ogrenciler_grup_id on ogrenciler(grup_id);
+create index if not exists idx_yoklama_tarih on yoklama(tarih);
+create index if not exists idx_yoklama_tur_id on yoklama(tur_id);
+create index if not exists idx_namaz_yoklama_tarih on namaz_yoklama(tarih);
+create index if not exists idx_namaz_yoklama_ogrenci_id on namaz_yoklama(ogrenci_id);
+create index if not exists idx_gorev_kisileri_liste_id on gorev_kisileri(liste_id);
+create index if not exists idx_gorev_kisileri_grup_id on gorev_kisileri(grup_id);
+create index if not exists idx_gorev_kayitlari_liste_id on gorev_kayitlari(liste_id);
+create index if not exists idx_gorev_kayitlari_tarih on gorev_kayitlari(tarih);
+create index if not exists idx_gorev_gruplari_liste_id on gorev_gruplari(liste_id);
+create index if not exists idx_erisim_kodu_moduller_kod_id on erisim_kodu_moduller(erisim_kodu_id);
 
 -- ------------------------------------------------------------
 -- BÖLÜM 3: Kitap Takip (kendi tabloları — tarayıcıdan anon key ile

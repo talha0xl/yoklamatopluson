@@ -4,11 +4,16 @@ Tek çatı altında birden fazla modülü barındıran, basit "erişim kodu" ile
 çok kullanıcılı yönetim portalı. PC'den ve telefondan aynı şekilde çalışır.
 
 ## Modüller
-- **Yurt Yoklama** — günlük yoklama, istatistik, WhatsApp veli bilgilendirme (eski `yurt-yoklama` projesinin taşınmış hali)
-- **Namaz Yoklama** — grup bazlı, 5 vakit namaz takibi
-- **Görev Listeleri** — Yemekçilik, Müezzinlik, Nöbetçi gibi sıralı görev/nöbet listeleri; her gün için yaptı/yapmadı + not
-- **Kitap Takip** — mevcut Takip Defteri sitenizin birebir aynısı (`public/kitap-takip.html`), kendi ayrı Supabase projesine bağlanır;
-  bu yüzden yukarıdaki portal veritabanından tamamen bağımsız çalışır, ekstra bir kurulum gerektirmez.
+- **Yurt Yoklama** — günlük yoklama, birden fazla "yoklama türü" (Günlük Yoklama, Pazar İzin Dönüşü vb.), istatistik,
+  WhatsApp veli bilgilendirme, yanlış işareti geri almak için "Sıfırla"
+- **Namaz Yoklama** — grup bazlı, 5 vakit namaz takibi; bir vakte tıkladıkça sırayla **Kıldı → Geç Kıldı → Kılmadı → boş** döner
+- **Görev Listeleri** — Yemekçilik, Müezzinlik, Nöbetçi, Çaycı gibi sıralı görev/nöbet listeleri; her gün için yaptı/yapmadı + not.
+  Bir liste içinde **alt gruplar** açılabilir (örn. Yemekçilik → 1. Grup / 2. Grup), kimin hangi grupta olduğu Yönetim'den ayarlanır.
+  Müezzinlik gibi listeler "vakit bazlı" işaretlenebilir (5 vakit ayrı ayrı, Namaz Yoklama'daki gibi).
+- **Kitap Takip** — mevcut Takip Defteri sitenizin birebir aynısı (`public/kitap-takip.html`), aynı Supabase projesinde
+  kendi tablolarını kullanır, portalın geri kalanıyla aynı giriş/erişim kontrolünden geçer.
+- **Veli Bilgilendirme** — önce hangi konuda mesaj gideceğini seçersiniz: Yurt Yoklama (türe göre, örn. sadece Pazar
+  İzin Dönüşü) veya Namaz Yoklama; sonra kime gideceğini filtreleyip WhatsApp bağlantısını üretirsiniz.
 
 ## Giriş ve yetkilendirme
 - Kullanıcı adı/e-posta yok — sadece "erişim kodu". Kime hangi kodu verdiyseniz o girer.
@@ -34,9 +39,10 @@ mesajı hazırlayıp WhatsApp'ı açan bir bağlantı üretiyor; siz sadece "Gö
 ### 1. Supabase projesi oluşturun
 1. [supabase.com](https://supabase.com) üzerinden ücretsiz hesap açın, **New Project** deyin.
 2. Proje açılınca sol menüden **SQL Editor** > **New query** açın.
-3. Önce `supabase_schema.sql`, sonra `supabase_schema_v2_portal.sql` dosyalarının tüm içeriğini SIRAYLA
-   yapıştırıp **Run** deyin. (İlki temel tabloları, 5-6-7-8. sınıfları ve ilk giriş kodunu `YT2026` olarak
-   ekler; ikincisi portal modüllerini — namaz yoklama, görev listeleri, modül izinleri — ekler.)
+3. Şu dosyaların tüm içeriğini SIRAYLA (birini bitirmeden diğerine geçmeyin) yapıştırıp **Run** deyin:
+   `supabase_schema.sql` → `supabase_schema_v2_portal.sql` → `supabase_schema_v3_yoklama_turu.sql` →
+   `supabase_schema_v4_gelismis.sql`. (Yepyeni/boş bir Supabase projesi açtıysanız bunun yerine tek başına
+   `supabase_schema_TEK_SEFERDE_KURULUM.sql` dosyasını çalıştırmanız yeterli — hepsini içinde barındırıyor.)
 4. Sol menüden **Project Settings > API** sayfasına gidin, şu ikisini not alın:
    - **Project URL**
    - **service_role key** (secret) — Bunu kimseyle paylaşmayın.

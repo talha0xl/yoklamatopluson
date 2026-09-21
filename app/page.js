@@ -50,7 +50,7 @@ async function ozetVerileriGetir(session) {
           .from("namaz_yoklama")
           .select("id", { count: "exact", head: true })
           .eq("tarih", tarih)
-          .eq("durum", "kildi");
+          .in("durum", ["kildi", "gec_kildi"]);
         ozet.namaz = { kildi: kildi || 0, toplamMumkun: toplamOgrenci * 5 };
       }
     }

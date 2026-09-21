@@ -9,29 +9,25 @@ const VAKITLER = [
   { anahtar: "yatsi", etiket: "Yatsı" },
 ];
 
+// Bir hücreye tıklandıkça sırayla döner: boş -> Kıldı -> Geç Kıldı -> Kılmadı -> boş
+const DURUM_SIRASI = [null, "kildi", "gec_kildi", "kilmadi"];
+const DURUM_ETIKET = { kildi: "Kıldı", gec_kildi: "Geç Kıldı", kilmadi: "Kılmadı" };
+const DURUM_SINIF = { kildi: "secili-geldi", gec_kildi: "secili-izinli", kilmadi: "secili-izinsiz" };
+
 function bugun() {
   const d = new Date();
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 }
 
-export default function NamazYoklamaIstemci() {
-  const [gruplar, setGruplar] = useState([]);
-  const [grupId, setGrupId] = useState(null);
+export default function NamazYoklamaIstemci({ baslangicGruplar }) {
+  const [gruplar] = useState(baslangicGruplar || []);
+  const [grupId, setGrupId] = useState(baslangicGruplar?.[0]?.id || null);
   const [tarih, setTarih] = useState(bugun());
   const [ogrenciler, setOgrenciler] = useState([]);
   // key: `${ogrenci_id}:${vakit}` -> kayit
   const [kayitMap, setKayitMap] = useState({});
   const [yukleniyor, setYukleniyor] = useState(true);
   const [kaydedenAnahtar, setKaydedenAnahtar] = useState(null);
-
-  useEffect(() => {
-    fetch("/api/gruplar")
-      .then((r) => r.json())
-      .then((d) => {
-        setGruplar(d.gruplar || []);
-        if (d.gruplar?.length) setGrupId(d.gruplar[0].id);
-      });
-  }, []);
 
   const veriGetir = useCallback(() => {
     if (!grupId || !tarih) return;
@@ -49,23 +45,34 @@ export default function NamazYoklamaIstemci() {
 
   useEffect(() => veriGetir(), [veriGetir]);
 
-  async function degistir(ogrenciId, vakit) {
+  async function tikla(ogrenciId, vakit) {
     const anahtar = `${ogrenciId}:${vakit}`;
-    const mevcut = kayitMap[anahtar];
-    const yeniDurum = mevcut?.durum === "kildi" ? "kilmadi" : "kildi";
+    const mevcutDurum = kayitMap[anahtar]?.durum ?? null;
+    const suankiIndeks = DURUM_SIRASI.indexOf(mevcutDurum);
+    const sonrakiDurum = DURUM_SIRASI[(suankiIndeks + 1) % DURUM_SIRASI.length];
+
     setKaydedenAnahtar(anahtar);
-    const res = await fetch("/api/namaz-yoklama", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ogrenci_id: ogrenciId, tarih, vakit, durum: yeniDurum }),
-    });
-    const d = await res.json();
-    if (d.kayit) setKayitMap((m) => ({ ...m, [anahtar]: d.kayit }));
+    if (sonrakiDurum === null) {
+      await fetch(`/api/namaz-yoklama?ogrenci_id=${ogrenciId}&tarih=${tarih}&vakit=${vakit}`, { method: "DELETE" });
+      setKayitMap((m) => {
+        const yeni = { ...m };
+        delete yeni[anahtar];
+        return yeni;
+      });
+    } else {
+      const res = await fetch("/api/namaz-yoklama", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ogrenci_id: ogrenciId, tarih, vakit, durum: sonrakiDurum }),
+      });
+      const d = await res.json();
+      if (d.kayit) setKayitMap((m) => ({ ...m, [anahtar]: d.kayit }));
+    }
     setKaydedenAnahtar(null);
   }
 
   const toplamHucre = ogrenciler.length * VAKITLER.length;
-  const kilinan = Object.values(kayitMap).filter((k) => k.durum === "kildi").length;
+  const kilinan = Object.values(kayitMap).filter((k) => k.durum === "kildi" || k.durum === "gec_kildi").length;
 
   return (
     <>
@@ -80,7 +87,7 @@ export default function NamazYoklamaIstemci() {
           max={bugun()}
         />
       </div>
-      <p className="sayfa-alt">Bir vakte tıkladığınızda kıldı/kılmadı olarak değişir, anında kaydedilir.</p>
+      <p className="sayfa-alt">Bir vakte tıkladıkça sırayla değişir: boş → Kıldı → Geç Kıldı → Kılmadı → boş. Anında kaydedilir.</p>
 
       <div className="grup-sekme">
         {gruplar.map((g) => (
@@ -127,12 +134,12 @@ export default function NamazYoklamaIstemci() {
                       return (
                         <td key={v.anahtar} style={{ textAlign: "center" }}>
                           <button
-                            className={`durum-btn ${durum === "kildi" ? "secili-geldi" : ""}`}
+                            className={`durum-btn ${durum ? DURUM_SINIF[durum] : ""}`}
                             disabled={kaydediliyor}
-                            onClick={() => degistir(o.id, v.anahtar)}
-                            style={{ minWidth: 74 }}
+                            onClick={() => tikla(o.id, v.anahtar)}
+                            style={{ minWidth: 88 }}
                           >
-                            {durum === "kildi" ? "Kıldı" : "—"}
+                            {durum ? DURUM_ETIKET[durum] : "—"}
                           </button>
                         </td>
                       );

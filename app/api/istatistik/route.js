@@ -29,15 +29,16 @@ export async function GET(req) {
     const sonuc = ogrenciler.map((o) => {
       const kOgr = kayitlar.filter((k) => k.ogrenci_id === o.id);
       const kildi = kOgr.filter((k) => k.durum === "kildi").length;
+      const gecKildi = kOgr.filter((k) => k.durum === "gec_kildi").length;
       const kilmadi = kOgr.filter((k) => k.durum === "kilmadi").length;
       const toplam = kOgr.length;
       return {
         ogrenci: o,
         geldi: kildi, // ortak arayüz için aynı alan adları kullanılıyor
-        izinli: 0,
+        izinli: gecKildi, // "geç kıldı"
         izinsiz: kilmadi,
         toplam,
-        oran: toplam ? Math.round((kildi / toplam) * 100) : null,
+        oran: toplam ? Math.round(((kildi + gecKildi) / toplam) * 100) : null,
       };
     });
     return NextResponse.json({ sonuc });
