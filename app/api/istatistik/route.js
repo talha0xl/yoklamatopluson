@@ -3,12 +3,51 @@ import { supabaseServer } from "../../../lib/supabaseServer";
 
 // GET /api/istatistik?kaynak=yoklama&grup_id=...&tur_id=...&baslangic=...&bitis=...
 // GET /api/istatistik?kaynak=namaz&grup_id=...&baslangic=...&bitis=...
+// GET /api/istatistik?kaynak=gorev&liste_id=...&baslangic=...&bitis=...
 export async function GET(req) {
   const kaynak = req.nextUrl.searchParams.get("kaynak") || "yoklama";
   const grupId = req.nextUrl.searchParams.get("grup_id");
   const baslangic = req.nextUrl.searchParams.get("baslangic");
   const bitis = req.nextUrl.searchParams.get("bitis");
   const supabase = supabaseServer();
+
+  if (kaynak === "gorev") {
+    const listeId = req.nextUrl.searchParams.get("liste_id");
+    const { data: kisiler, error: ek1 } = await supabase
+      .from("gorev_kisileri")
+      .select("*")
+      .eq("aktif", true)
+      .eq("liste_id", listeId)
+      .order("sira");
+    if (ek1) return NextResponse.json({ error: ek1.message }, { status: 500 });
+    const kisiIds = (kisiler || []).map((k) => k.id);
+
+    let kayitlar = [];
+    if (kisiIds.length) {
+      let q = supabase.from("gorev_kayitlari").select("*").in("kisi_id", kisiIds);
+      if (baslangic) q = q.gte("tarih", baslangic);
+      if (bitis) q = q.lte("tarih", bitis);
+      const { data, error: ek2 } = await q;
+      if (ek2) return NextResponse.json({ error: ek2.message }, { status: 500 });
+      kayitlar = data;
+    }
+
+    const sonuc = (kisiler || []).map((k) => {
+      const kK = kayitlar.filter((r) => r.kisi_id === k.id);
+      const yapti = kK.filter((r) => r.yapildi).length;
+      const yapmadi = kK.filter((r) => !r.yapildi).length;
+      const toplam = kK.length;
+      return {
+        ogrenci: k, // ortak arayüz için aynı alan adı kullanılıyor
+        geldi: yapti,
+        izinli: 0,
+        izinsiz: yapmadi,
+        toplam,
+        oran: toplam ? Math.round((yapti / toplam) * 100) : null,
+      };
+    });
+    return NextResponse.json({ sonuc });
+  }
 
   let ogrenciQ = supabase.from("ogrenciler").select("*").eq("aktif", true).order("ad_soyad");
   if (grupId) ogrenciQ = ogrenciQ.eq("grup_id", grupId);

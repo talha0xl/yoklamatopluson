@@ -234,3 +234,36 @@ tr:last-child td { border-bottom: none; }
 .acilis-logo-goster { opacity: 0.98; transform: scale(1); }
 .acilis-serit { width: min(160px, 40vw); opacity: 0; animation: acilisSeritGoster 0.5s ease 0.35s forwards; }
 @keyframes acilisSeritGoster { to { opacity: 0.85; } }
+
+/* ---------- Sayfa içi yükleniyor ekranı (route geçişlerinde) ----------
+   Kenar menü sabit kalırken sadece içerik alanında kısa süre görünür. */
+.yukleniyor-ekrani {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  min-height: 60vh;
+  opacity: 0;
+  animation: yukleniyorGoster 0.4s ease 0.15s forwards;
+}
+@keyframes yukleniyorGoster { to { opacity: 1; } }
+.yukleniyor-logo {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  animation: yukleniyorNabiz 1.3s ease-in-out infinite;
+}
+@keyframes yukleniyorNabiz {
+  0%, 100% { transform: scale(0.92); opacity: 0.6; }
+  50% { transform: scale(1.04); opacity: 1; }
+}
+.yukleniyor-serit { width: 120px; opacity: 0.8; }
+.yukleniyor-metin { font-size: 13px; color: var(--metin-soluk); letter-spacing: 0.01em; }
+
+/* Otomatik sırada olan kişinin satırını hafifçe vurgula */
+.ogrenci-satir.sirdaki-satir, tr.sirdaki-satir {
+  background: rgba(40, 51, 74, 0.05);
+  border-left: 3px solid var(--lacivert);
+}
+tr.sirdaki-satir td:first-child { padding-left: 11px; }

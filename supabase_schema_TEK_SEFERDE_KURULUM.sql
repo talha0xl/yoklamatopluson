@@ -125,10 +125,21 @@ create table if not exists gorev_listeleri (
   isim text not null unique,
   siralama int not null default 0,
   vakit_bazli boolean not null default false,
+  rotasyonlu boolean not null default false,
+  rotasyon_baslangic date not null default current_date,
   created_at timestamptz not null default now()
 );
 
 create table if not exists gorev_gruplari (
+  id uuid primary key default gen_random_uuid(),
+  liste_id uuid not null references gorev_listeleri(id) on delete cascade,
+  isim text not null,
+  siralama int not null default 0,
+  created_at timestamptz not null default now(),
+  unique (liste_id, isim)
+);
+
+create table if not exists gorev_kategorileri (
   id uuid primary key default gen_random_uuid(),
   liste_id uuid not null references gorev_listeleri(id) on delete cascade,
   isim text not null,
@@ -152,7 +163,7 @@ create table if not exists gorev_kayitlari (
   liste_id uuid not null references gorev_listeleri(id) on delete cascade,
   kisi_id uuid not null references gorev_kisileri(id) on delete cascade,
   tarih date not null default current_date,
-  vakit text not null default 'gun' check (vakit in ('gun','sabah','ogle','ikindi','aksam','yatsi')),
+  vakit text not null default 'gun', -- 'gun' = kategorisiz; aksi halde o listenin bir gorev_kategorileri.isim değeri
   yapildi boolean not null default false,
   not_metni text,
   created_at timestamptz not null default now(),
@@ -161,12 +172,30 @@ create table if not exists gorev_kayitlari (
 );
 alter table gorev_listeleri enable row level security;
 alter table gorev_gruplari enable row level security;
+alter table gorev_kategorileri enable row level security;
 alter table gorev_kisileri enable row level security;
 alter table gorev_kayitlari enable row level security;
 
-insert into gorev_listeleri (isim, siralama, vakit_bazli) values
-  ('Yemekçilik', 1, false), ('Müezzinlik', 2, true), ('Nöbetçi', 3, false)
+insert into gorev_listeleri (isim, siralama, vakit_bazli, rotasyonlu) values
+  ('Yemekçilik', 1, true, false),
+  ('Müezzinlik', 2, true, true),
+  ('Nöbetçi', 3, false, true),
+  ('Çaycı', 4, false, true)
 on conflict (isim) do nothing;
+
+insert into gorev_kategorileri (liste_id, isim, siralama)
+select gl.id, v.isim, v.sira
+from gorev_listeleri gl
+cross join (values ('Sabah',1),('Öğle',2),('İkindi',3),('Akşam',4),('Yatsı',5)) as v(isim, sira)
+where gl.isim = 'Müezzinlik'
+on conflict (liste_id, isim) do nothing;
+
+insert into gorev_kategorileri (liste_id, isim, siralama)
+select gl.id, v.isim, v.sira
+from gorev_listeleri gl
+cross join (values ('Kahvaltı',1),('Öğle',2),('Akşam',3)) as v(isim, sira)
+where gl.isim = 'Yemekçilik'
+on conflict (liste_id, isim) do nothing;
 
 create index if not exists idx_ogrenciler_grup_id on ogrenciler(grup_id);
 create index if not exists idx_yoklama_tarih on yoklama(tarih);
@@ -178,6 +207,7 @@ create index if not exists idx_gorev_kisileri_grup_id on gorev_kisileri(grup_id)
 create index if not exists idx_gorev_kayitlari_liste_id on gorev_kayitlari(liste_id);
 create index if not exists idx_gorev_kayitlari_tarih on gorev_kayitlari(tarih);
 create index if not exists idx_gorev_gruplari_liste_id on gorev_gruplari(liste_id);
+create index if not exists idx_gorev_kategorileri_liste_id on gorev_kategorileri(liste_id);
 create index if not exists idx_erisim_kodu_moduller_kod_id on erisim_kodu_moduller(erisim_kodu_id);
 
 -- ------------------------------------------------------------

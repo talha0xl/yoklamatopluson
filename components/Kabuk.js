@@ -1,10 +1,13 @@
 import { cookies } from "next/headers";
-import Link from "next/link";
 import { verifySession } from "../lib/session";
 import { MODULLER, modulErisimVarMi } from "../lib/moduller";
-import CikisButonu from "./CikisButonu";
+import KabukNav from "./KabukNav";
 
-export default async function Kabuk({ aktif, children }) {
+// Kabuk artık kök layout'ta BİR KEZ render ediliyor (sayfa geçişlerinde yeniden
+// yüklenmiyor, kaybolup gelmiyor). Aktif menü öğesi KabukNav içinde (client,
+// usePathname ile) belirleniyor, böylece sayfa değişince sadece içerik alanı
+// değişiyor, kenar menü sabit kalıyor — geçişler çok daha hızlı hissettiriyor.
+export default async function Kabuk({ children }) {
   const token = cookies().get("yt_session")?.value;
   const session = token ? await verifySession(token, process.env.SESSION_SECRET) : null;
 
@@ -16,43 +19,12 @@ export default async function Kabuk({ aktif, children }) {
 
   return (
     <div className="kabuk">
-      <aside className="yan-menu">
-        <div className="logo-alan">
-          <Link href="/">
-            <img src="/logo.png" alt="Yavuztürk Süleymaniye" />
-          </Link>
-        </div>
-        <nav>
-          <Link href="/" className={aktif === "/" ? "aktif" : ""}>
-            Ana Sayfa
-          </Link>
-          {modulLinkleri.map((m) => (
-            <Link key={m.href} href={m.href} className={aktif === m.href ? "aktif" : ""}>
-              {m.etiket}
-              {m.altYazi ? <span className="menu-rozet">{m.altYazi}</span> : null}
-            </Link>
-          ))}
-          {duzYoklamaVarMi && (
-            <>
-              <Link href="/istatistik" className={aktif === "/istatistik" ? "aktif" : ""}>
-                İstatistik
-              </Link>
-              <Link href="/mesaj" className={aktif === "/mesaj" ? "aktif" : ""}>
-                Veli Bilgilendirme
-              </Link>
-            </>
-          )}
-          {session?.admin && (
-            <Link href="/admin" className={aktif === "/admin" ? "aktif" : ""}>
-              Yönetim
-            </Link>
-          )}
-        </nav>
-        <CikisButonu />
-        <div className="alt-bilgi">
-          {session?.sahip_adi ? <>Giriş: {session.sahip_adi}</> : null}
-        </div>
-      </aside>
+      <KabukNav
+        modulLinkleri={modulLinkleri}
+        duzYoklamaVarMi={duzYoklamaVarMi}
+        isAdmin={!!session?.admin}
+        sahipAdi={session?.sahip_adi || null}
+      />
       <div className="icerik">
         <div className="sayfa">{children}</div>
       </div>
