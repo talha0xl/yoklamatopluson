@@ -39,6 +39,7 @@ export default function NamazYoklamaIstemci({ baslangicGruplar }) {
   const [yukleniyor, setYukleniyor] = useState(true);
   const [sebepAcikAnahtar, setSebepAcikAnahtar] = useState(null);
   const [sebepTaslak, setSebepTaslak] = useState("");
+  const [kayitHata, setKayitHata] = useState("");
 
   const tazele = useCallback(
     (sessiz) => {
@@ -85,14 +86,19 @@ export default function NamazYoklamaIstemci({ baslangicGruplar }) {
       const d = await res.json();
       if (d.kayit) setKayitMap((m) => ({ ...m, [anahtar]: d.kayit }));
       else throw new Error(d.error || "kayıt hatası");
-    } catch {
-      // Sunucu hata verdiyse eski haline geri al
+    } catch (err) {
+      // Sunucu hata verdiyse eski haline geri al ve neden olduğunu göster
+      // (aksi halde buton sessizce eski haline dönüyor, kafa karıştırıyor)
       setKayitMap((m) => {
         const yeni = { ...m };
         if (oncekiKayit) yeni[anahtar] = oncekiKayit;
         else delete yeni[anahtar];
         return yeni;
       });
+      setKayitHata(
+        `Kaydedilemedi, işaretiniz geri alındı (${err.message}). Supabase'de v7/v9 SQL güncellemesi çalıştırılmamış olabilir.`
+      );
+      setTimeout(() => setKayitHata(""), 8000);
     }
   }
 
@@ -139,6 +145,8 @@ export default function NamazYoklamaIstemci({ baslangicGruplar }) {
         />
       </div>
       <p className="sayfa-alt">Önce vakti seçin, sonra isme göre Geldi / Geç Geldi / İzinli / Gelmedi'ye tek dokunuşla işaretleyin.</p>
+
+      {kayitHata && <div className="hata" style={{ marginBottom: 16 }}>{kayitHata}</div>}
 
       <label className="etiket" style={{ marginBottom: 6, display: "block" }}>Vakit</label>
       <div className="grup-sekme">

@@ -6,24 +6,32 @@ function bugun() {
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 }
 
-// Bir öğrencinin kayıtlı yakınlarından (anne/baba/diğer) telefonu olanları
-// tek tek listeler — her biri kendi WhatsApp bağlantısını alır. Eski
-// (v8 öncesi) kayıtlarda tek "veli" alanı varsa ona geri düşer.
+// Bir öğrencinin kayıtlı yakınlarından (ogrenci_yakinlari tablosu) telefonu
+// olanları tek tek listeler — her biri kendi WhatsApp bağlantısını alır.
+// Henüz v9 SQL'i çalıştırılmamış / eski (v8 öncesi) kayıtlarda yakın
+// tablosu boşsa eski anne/baba/diğer/veli alanlarına geri düşer.
 function ogrenciKontaklari(o) {
-  const kontaklar = [];
-  if (o.anne_telefon) kontaklar.push({ etiket: "Anne", ad: o.anne_adi || "Anne", telefon: o.anne_telefon });
-  if (o.baba_telefon) kontaklar.push({ etiket: "Baba", ad: o.baba_adi || "Baba", telefon: o.baba_telefon });
+  const yakinlar = Array.isArray(o.ogrenci_yakinlari) ? o.ogrenci_yakinlari : [];
+  const kontaklar = yakinlar
+    .filter((y) => y.telefon)
+    .map((y) => ({ etiket: y.yakinlik || "Yakını", ad: y.ad_soyad || y.yakinlik || "Yakını", telefon: y.telefon }));
+  if (kontaklar.length) return kontaklar;
+
+  // Eski şema geri düşüşü
+  const eski = [];
+  if (o.anne_telefon) eski.push({ etiket: "Anne", ad: o.anne_adi || "Anne", telefon: o.anne_telefon });
+  if (o.baba_telefon) eski.push({ etiket: "Baba", ad: o.baba_adi || "Baba", telefon: o.baba_telefon });
   if (o.diger_yakin_telefon) {
-    kontaklar.push({
+    eski.push({
       etiket: o.diger_yakin_yakinlik || "Diğer",
       ad: o.diger_yakin_adi || o.diger_yakin_yakinlik || "Yakını",
       telefon: o.diger_yakin_telefon,
     });
   }
-  if (!kontaklar.length && o.veli_telefon) {
-    kontaklar.push({ etiket: "Veli", ad: o.veli_adi || "Veli", telefon: o.veli_telefon });
+  if (!eski.length && o.veli_telefon) {
+    eski.push({ etiket: "Veli", ad: o.veli_adi || "Veli", telefon: o.veli_telefon });
   }
-  return kontaklar;
+  return eski;
 }
 
 function whatsappNumarasi(tel) {
@@ -57,23 +65,78 @@ export default function MesajIstemci({ baslangicGruplar, baslangicTurler }) {
   const [turId, setTurId] = useState(baslangicTurler?.[0]?.id || null);
   const [tarih, setTarih] = useState(bugun());
   const [durumFiltre, setDurumFiltre] = useState("izinsiz");
+  const [sablonlar, setSablonlar] = useState([]);
+  const [sablonId, setSablonId] = useState(null);
   const [sablon, setSablon] = useState(VARSAYILAN_SABLON_YOKLAMA);
   const [sablonElleDegisti, setSablonElleDegisti] = useState(false);
+  const [sablonKaydediliyor, setSablonKaydediliyor] = useState(false);
+  const [sablonHata, setSablonHata] = useState("");
   const [ogrenciler, setOgrenciler] = useState([]);
   const [kayitMap, setKayitMap] = useState({}); // yoklama: ogrenci_id -> kayit | namaz: ogrenci_id -> [kayitlar]
   const [yukleniyor, setYukleniyor] = useState(true);
+  const [kayitHata, setKayitHata] = useState("");
 
-  // Kaynak değişince filtre ve şablonu o kaynağa uygun varsayılana çek.
+  // Kaynak değişince filtre ve şablon listesini o kaynağa uygun olana çek.
   // ogrenciler/kayitMap'i de HEMEN boşaltıyoruz: "namaz" kaynağında kayıt
   // şekli dizi, "yoklama" kaynağında tek nesne — yeni veri gelene kadar eski
   // (yanlış şekilde) veri ekranda kalırsa aşağıdaki hesaplamalar çöküyordu
   // ("kayitlar.some is not a function").
   useEffect(() => {
     setDurumFiltre(kaynak === "namaz" ? "kilmadi" : "izinsiz");
-    if (!sablonElleDegisti) setSablon(kaynak === "namaz" ? VARSAYILAN_SABLON_NAMAZ : VARSAYILAN_SABLON_YOKLAMA);
     setOgrenciler([]);
     setKayitMap({});
-  }, [kaynak]); // eslint-disable-line react-hooks/exhaustive-deps
+    setSablonElleDegisti(false);
+    fetch(`/api/mesaj-sablonlari?kaynak=${kaynak}`)
+      .then((r) => r.json())
+      .then((d) => {
+        const liste = d.sablonlar || [];
+        setSablonlar(liste);
+        const ilk = liste[0];
+        setSablonId(ilk?.id || null);
+        setSablon(ilk?.icerik || (kaynak === "namaz" ? VARSAYILAN_SABLON_NAMAZ : VARSAYILAN_SABLON_YOKLAMA));
+      });
+  }, [kaynak]);
+
+  function sablonSec(s) {
+    setSablonId(s.id);
+    setSablon(s.icerik);
+    setSablonElleDegisti(false);
+    setSablonHata("");
+  }
+
+  async function sablonuKaydet() {
+    if (!sablonId) return;
+    setSablonKaydediliyor(true);
+    setSablonHata("");
+    const res = await fetch(`/api/mesaj-sablonlari/${sablonId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ icerik: sablon }),
+    });
+    const d = await res.json();
+    setSablonKaydediliyor(false);
+    if (d.error) return setSablonHata(d.error);
+    setSablonlar((liste) => liste.map((s) => (s.id === sablonId ? { ...s, icerik: sablon } : s)));
+    setSablonElleDegisti(false);
+  }
+
+  async function sablonuFarkliKaydet() {
+    const ad = prompt("Yeni şablona bir isim verin (örn. \"Kısa versiyon\"):");
+    if (!ad?.trim()) return;
+    setSablonKaydediliyor(true);
+    setSablonHata("");
+    const res = await fetch("/api/mesaj-sablonlari", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ad: ad.trim(), kaynak, icerik: sablon, siralama: sablonlar.length + 1 }),
+    });
+    const d = await res.json();
+    setSablonKaydediliyor(false);
+    if (d.error) return setSablonHata(d.error);
+    setSablonlar((liste) => [...liste, d.sablon]);
+    setSablonId(d.sablon.id);
+    setSablonElleDegisti(false);
+  }
 
   const getir = useCallback(() => {
     if (!grupId) return;
@@ -220,6 +283,25 @@ export default function MesajIstemci({ baslangicGruplar, baslangicTurler }) {
                 </div>
               </div>
               <label className="etiket">Mesaj şablonu</label>
+              {sablonlar.length > 0 && (
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+                  {sablonlar.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      className="btn-hayalet-sekme"
+                      style={
+                        s.id === sablonId
+                          ? { background: "var(--lacivert)", borderColor: "var(--lacivert)", color: "#fff" }
+                          : undefined
+                      }
+                      onClick={() => sablonSec(s)}
+                    >
+                      {s.ad}
+                    </button>
+                  ))}
+                </div>
+              )}
               <textarea
                 className="girdi"
                 rows={3}
@@ -233,6 +315,20 @@ export default function MesajIstemci({ baslangicGruplar, baslangicTurler }) {
                 Kullanabileceğiniz alanlar: {"{veli}"}, {"{ogrenci}"}, {"{tarih}"}, {"{durum}"}
                 {kaynak === "yoklama" && <> , {"{tur}"}</>}
               </div>
+              {sablonElleDegisti && (
+                <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap", alignItems: "center" }}>
+                  {sablonId && (
+                    <button type="button" className="btn btn-lacivert btn-sm" disabled={sablonKaydediliyor} onClick={sablonuKaydet}>
+                      {sablonKaydediliyor ? "Kaydediliyor..." : "Bu şablonu güncelle"}
+                    </button>
+                  )}
+                  <button type="button" className="btn btn-hayalet btn-sm" disabled={sablonKaydediliyor} onClick={sablonuFarkliKaydet}>
+                    Yeni şablon olarak kaydet
+                  </button>
+                  <span style={{ fontSize: 12, color: "var(--metin-soluk)" }}>Değişiklik henüz kaydedilmedi</span>
+                </div>
+              )}
+              {sablonHata && <div className="hata" style={{ marginTop: 10 }}>{sablonHata}</div>}
             </div>
           </div>
 

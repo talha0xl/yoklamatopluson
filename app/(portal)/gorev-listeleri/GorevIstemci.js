@@ -95,7 +95,7 @@ function VazifeKarti({ liste, tarih }) {
     <div className="kart vazife-kart">
       <div className="kart-ic">
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-          <h3 style={{ fontSize: 15, margin: 0, color: "var(--lacivert)" }}>{liste.isim}</h3>
+          <h3 style={{ fontSize: 15, margin: 0, color: "var(--baslik)" }}>{liste.isim}</h3>
           {kategoriler.length > 0 && (
             <span className="rozet rozet-gri" style={{ fontSize: 10.5 }}>
               {kategoriler.map((k) => k.isim).join(" · ")}
@@ -120,12 +120,16 @@ function VazifeKarti({ liste, tarih }) {
             <div style={{ fontSize: 12.5, color: "var(--metin-soluk)", marginBottom: 2 }}>
               {tarihEtiket(tarih, bugunISO())} sırada
             </div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: "var(--lacivert)", marginBottom: 12 }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: "var(--baslik)", marginBottom: bugunVazifeli?.uyeler?.length > 1 ? 6 : 12 }}>
               {bugunVazifeli?.isim || "—"}
             </div>
             {bugunVazifeli?.uyeler?.length > 1 && (
-              <div style={{ fontSize: 12.5, color: "var(--metin-soluk)", marginBottom: 12 }}>
-                {bugunVazifeli.uyeler.map((u) => u.ad_soyad).join(", ")}
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+                {bugunVazifeli.uyeler.map((u) => (
+                  <span key={u.id} className="rozet rozet-gri" style={{ fontWeight: 600 }}>
+                    {u.ad_soyad}
+                  </span>
+                ))}
               </div>
             )}
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -349,7 +353,7 @@ function YonetimPaneli({ listeler, onDegisti }) {
               </button>
             </form>
 
-            <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid var(--kenar)" }}>
+            <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
               <h3 style={{ fontSize: 15, marginBottom: 8 }}>Etiketler (opsiyonel)</h3>
               <p style={{ fontSize: 12.5, color: "var(--metin-soluk)", marginBottom: 10 }}>
                 Kartın altında bilgi amaçlı görünür — örn. Müezzinlik için 5 vakit, Yemekçilik için Kahvaltı/Öğle/Akşam.
@@ -372,7 +376,7 @@ function YonetimPaneli({ listeler, onDegisti }) {
             </div>
 
             {seciliListe && (
-              <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid var(--kenar)" }}>
+              <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
                 <button className="btn btn-hayalet btn-sm" onClick={() => listeAyariGuncelle({ rotasyonlu: !seciliListe.rotasyonlu })}>
                   {seciliListe.rotasyonlu ? "Otomatik sıra: Açık — kapat" : "Otomatik sıra: Kapalı — aç"}
                 </button>

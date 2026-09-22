@@ -8,7 +8,7 @@ export async function GET(req) {
   const turId = req.nextUrl.searchParams.get("tur_id");
   const supabase = supabaseServer();
 
-  let ogrenciQ = supabase.from("ogrenciler").select("*").eq("aktif", true).order("ad_soyad");
+  let ogrenciQ = supabase.from("ogrenciler").select("*, ogrenci_yakinlari(*)").eq("aktif", true).order("ad_soyad");
   if (grupId) ogrenciQ = ogrenciQ.eq("grup_id", grupId);
   const { data: ogrenciler, error: e1 } = await ogrenciQ;
   if (e1) return NextResponse.json({ error: e1.message }, { status: 500 });

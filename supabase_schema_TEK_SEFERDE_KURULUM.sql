@@ -32,9 +32,26 @@ create table if not exists ogrenciler (
   diger_yakin_yakinlik text, -- örn. "Amca", "Abla"
   diger_yakin_adi text,
   diger_yakin_telefon text,
+  yasadigi_yer text,         -- adres — harita butonu için
   aktif boolean not null default true,
   created_at timestamptz not null default now()
 );
+
+-- Esnek öğrenci yakınları: Yönetim > Öğrenciler'de "Veli Ekle" ile
+-- istenildiği kadar yakın eklenir (isim, telefon, meslek, yaşadığı yer).
+create table if not exists ogrenci_yakinlari (
+  id uuid primary key default gen_random_uuid(),
+  ogrenci_id uuid not null references ogrenciler(id) on delete cascade,
+  yakinlik text not null,
+  ad_soyad text,
+  telefon text,
+  meslek text,
+  yasadigi_yer text,
+  siralama int not null default 0,
+  created_at timestamptz not null default now()
+);
+alter table ogrenci_yakinlari enable row level security;
+create index if not exists idx_ogrenci_yakinlari_ogrenci_id on ogrenci_yakinlari(ogrenci_id);
 
 -- Yoklama türleri: "Günlük Yoklama" varsayılan olarak gelir, istediğiniz
 -- kadar yeni tür ekleyebilirsiniz (örn. "Pazar İzin Dönüşü") — aynı gün
@@ -179,6 +196,25 @@ create table if not exists gorev_kayitlari (
   updated_at timestamptz not null default now(),
   unique (kisi_id, tarih, vakit)
 );
+create table if not exists mesaj_sablonlari (
+  id uuid primary key default gen_random_uuid(),
+  ad text not null unique,
+  kaynak text not null default 'genel' check (kaynak in ('yoklama', 'namaz', 'genel')),
+  icerik text not null,
+  siralama int not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table mesaj_sablonlari enable row level security;
+insert into mesaj_sablonlari (ad, kaynak, icerik, siralama) values
+  ('Yoklama — Standart', 'yoklama', 'Sayın {veli}, {ogrenci} adlı öğrencimizin {tarih} tarihli {tur} durumu: {durum}. Bilginize sunarız. Yavuztürk Süleymaniye Yurdu', 1),
+  ('Yoklama — Kısa', 'yoklama', '{ogrenci} — {tarih}: {durum}. Yavuztürk Süleymaniye Yurdu', 2),
+  ('Yoklama — Resmi', 'yoklama', 'Sayın {veli}, öğrencimiz {ogrenci}''nin {tarih} tarihindeki {tur} kaydı "{durum}" olarak işlenmiştir. Bilgilerinize sunarız. Saygılarımızla, Yavuztürk Süleymaniye Yurdu Yönetimi', 3),
+  ('Namaz Yoklama — Standart', 'namaz', 'Sayın {veli}, {ogrenci} adlı öğrencimizin {tarih} tarihli namaz durumu: {durum}. Bilginize sunarız. Yavuztürk Süleymaniye Yurdu', 1),
+  ('Namaz Yoklama — Kısa', 'namaz', '{ogrenci} — {tarih} namaz: {durum}. Yavuztürk Süleymaniye Yurdu', 2),
+  ('Namaz Yoklama — Resmi', 'namaz', 'Sayın {veli}, öğrencimiz {ogrenci}''nin {tarih} tarihli namaz vakitleri durumu: {durum}. Bilgilerinize sunarız. Saygılarımızla, Yavuztürk Süleymaniye Yurdu Yönetimi', 3)
+on conflict do nothing;
+
 alter table gorev_listeleri enable row level security;
 alter table gorev_gruplari enable row level security;
 alter table gorev_kategorileri enable row level security;

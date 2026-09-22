@@ -160,7 +160,7 @@ export default function IstatistikIstemci({ baslangicGruplar, baslangicTurler, b
           {genelOran !== null && (
             <div style={{ marginLeft: "auto", textAlign: "right" }}>
               <div style={{ fontSize: 13, color: "var(--metin-soluk)" }}>Genel {basliklar.oranEtiket.toLocaleLowerCase("tr")}</div>
-              <div style={{ fontSize: 26, fontWeight: 800, color: "var(--lacivert)" }}>%{genelOran}</div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: "var(--baslik)" }}>%{genelOran}</div>
             </div>
           )}
         </div>

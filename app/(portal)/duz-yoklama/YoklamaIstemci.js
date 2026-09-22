@@ -22,6 +22,7 @@ export default function YoklamaIstemci({ isAdmin, baslangicTurler, baslangicGrup
   const [yukleniyor, setYukleniyor] = useState(true);
   const [sebepAcikId, setSebepAcikId] = useState(null);
   const [sebepTaslak, setSebepTaslak] = useState("");
+  const [kayitHata, setKayitHata] = useState("");
 
   const turleriGetir = useCallback(() => {
     fetch("/api/yoklama-turleri")
@@ -72,13 +73,15 @@ export default function YoklamaIstemci({ isAdmin, baslangicTurler, baslangicGrup
       const d = await res.json();
       if (d.kayit) setKayitMap((m) => ({ ...m, [ogrenciId]: d.kayit }));
       else throw new Error(d.error || "kayıt hatası");
-    } catch {
+    } catch (err) {
       setKayitMap((m) => {
         const yeni = { ...m };
         if (oncekiKayit) yeni[ogrenciId] = oncekiKayit;
         else delete yeni[ogrenciId];
         return yeni;
       });
+      setKayitHata(`Kaydedilemedi, işaretiniz geri alındı (${err.message}).`);
+      setTimeout(() => setKayitHata(""), 8000);
     }
   }
 
@@ -141,6 +144,8 @@ export default function YoklamaIstemci({ isAdmin, baslangicTurler, baslangicGrup
         />
       </div>
       <p className="sayfa-alt">Önce hangi amaçla yoklama aldığınızı seçin, sonra "Geldi"'ye basınca saat otomatik kaydedilir.</p>
+
+      {kayitHata && <div className="hata" style={{ marginBottom: 16 }}>{kayitHata}</div>}
 
       <label className="etiket" style={{ marginBottom: 6, display: "block" }}>Yoklama türü</label>
       <div className="grup-sekme">

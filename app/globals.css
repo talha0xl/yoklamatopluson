@@ -30,6 +30,13 @@
   --uyari-metin: #7a5416;
   --hata-bg: #fbeceb;
   --hata-border: #f0bcb9;
+  /* Başlık/vurgu metin rengi: açık temada marka lacivertiyle aynı, koyu
+     temada okunabilmesi için açık bir tona dönüyor (aşağıda). Kart/sayfa
+     üstündeki BAŞLIK METİNLERİ için kullanılır — arkaplan olarak
+     kullanılan yerlerde (kenar menü, buton, giriş ekranı) hâlâ
+     var(--lacivert) kullanılıyor, çünkü o yüzeyler her zaman koyu lacivert
+     kalıyor. */
+  --baslik: var(--lacivert);
   color-scheme: light;
 }
 
@@ -56,6 +63,7 @@ html[data-tema="koyu"] {
   --uyari-metin: #e3b972;
   --hata-bg: rgba(179, 65, 59, 0.16);
   --hata-border: rgba(179, 65, 59, 0.45);
+  --baslik: #a9c2e6;
   color-scheme: dark;
 }
 
@@ -130,14 +138,14 @@ input, select, textarea { font-family: inherit; }
   width: 44px; height: 44px; border-radius: 12px; background: var(--gri-acik);
   display: flex; align-items: center; justify-content: center; margin-bottom: 16px;
 }
-.modul-baslik { font-family: var(--font-display); font-size: 17px; font-weight: 700; color: var(--lacivert); margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.modul-baslik { font-family: var(--font-display); font-size: 17px; font-weight: 700; color: var(--baslik); margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
 .modul-aciklama { font-size: 13.5px; color: var(--metin-soluk); line-height: 1.5; }
 
 /* ---------- Ana sayfa: bugünün özeti ---------- */
 .ozet-baslik { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--metin-soluk); margin: 28px 0 12px; }
 .ozet-izgara { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; margin-bottom: 8px; }
 .ozet-kart { background: var(--yuzey); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px 20px; }
-.ozet-deger { font-family: var(--font-display); font-size: 28px; font-weight: 800; color: var(--lacivert); line-height: 1.1; }
+.ozet-deger { font-family: var(--font-display); font-size: 28px; font-weight: 800; color: var(--baslik); line-height: 1.1; }
 .ozet-etiket { font-size: 13px; color: var(--metin-soluk); margin-top: 6px; }
 .ozet-cubuk-sarma { height: 6px; background: var(--gri-acik); border-radius: 100px; overflow: hidden; margin-top: 10px; }
 .ozet-cubuk { height: 100%; background: var(--yesil); border-radius: 100px; }
@@ -161,7 +169,7 @@ input, select, textarea { font-family: inherit; }
 }
 .sayfa { padding: 32px 36px 60px; max-width: 1100px; }
 .sayfa-baslik { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px; flex-wrap: wrap; gap: 8px; }
-.sayfa-baslik h1 { font-size: 24px; font-weight: 700; color: var(--lacivert); }
+.sayfa-baslik h1 { font-size: 24px; font-weight: 700; color: var(--baslik); }
 .sayfa-alt { color: var(--metin-soluk); font-size: 14.5px; margin: 6px 0 26px; }
 
 /* ---------- Mobil: alt gezinme çubuğuna dönüşen menü ---------- */
@@ -197,7 +205,7 @@ input, select, textarea { font-family: inherit; }
 .btn-lacivert:hover { opacity: 0.92; }
 .btn-yesil { background: var(--yesil); color: #fff; }
 .btn-yesil:hover { opacity: 0.92; }
-.btn-hayalet { background: transparent; color: var(--lacivert); border-color: var(--border); }
+.btn-hayalet { background: transparent; color: var(--baslik); border-color: var(--border); }
 .btn-hayalet:hover { background: var(--gri-acik); }
 .btn-tehlike { background: var(--yuzey); color: var(--kirmizi); border-color: var(--kirmizi); }
 .btn-tehlike:hover { background: var(--hata-bg); }
@@ -234,7 +242,7 @@ tr:last-child td { border-bottom: none; }
   padding: 9px 18px; border-radius: 100px; border: 1.5px dashed var(--border); background: transparent;
   font-weight: 700; font-size: 14px; color: var(--metin-soluk);
 }
-.btn-hayalet-sekme:hover { border-color: var(--lacivert); color: var(--lacivert); }
+.btn-hayalet-sekme:hover { border-color: var(--baslik); color: var(--baslik); }
 
 .ogrenci-satir { display: flex; align-items: center; justify-content: space-between; padding: 14px 4px; border-bottom: 1px solid var(--border); gap: 12px; flex-wrap: wrap; }
 .ogrenci-satir:last-child { border-bottom: none; }
@@ -294,28 +302,32 @@ tr:last-child td { border-bottom: none; }
 
 /* ---------- Sayfa içi yükleniyor ekranı (route geçişlerinde) ----------
    Kenar menü sabit kalırken sadece içerik alanında kısa süre görünür. */
-.yukleniyor-ekrani {
+.yukleniyor-tam-ekran {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  background: var(--lacivert);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  min-height: 60vh;
+  gap: 18px;
   opacity: 0;
-  animation: yukleniyorGoster 0.4s ease 0.15s forwards;
+  animation: yukleniyorGoster 0.25s ease forwards;
 }
 @keyframes yukleniyorGoster { to { opacity: 1; } }
-.yukleniyor-logo {
-  width: 56px;
-  height: 56px;
-  object-fit: contain;
+.yukleniyor-tam-logo {
+  width: min(220px, 55vw);
+  height: auto;
+  filter: brightness(0) invert(1);
+  opacity: 0.98;
   animation: yukleniyorNabiz 1.3s ease-in-out infinite;
 }
 @keyframes yukleniyorNabiz {
-  0%, 100% { transform: scale(0.92); opacity: 0.6; }
-  50% { transform: scale(1.04); opacity: 1; }
+  0%, 100% { transform: scale(0.94); opacity: 0.75; }
+  50% { transform: scale(1.02); opacity: 1; }
 }
-.yukleniyor-serit { width: 120px; opacity: 0.8; }
+.yukleniyor-serit { width: 140px; opacity: 0.85; }
 .yukleniyor-metin { font-size: 13px; color: var(--metin-soluk); letter-spacing: 0.01em; }
 
 /* Otomatik sırada olan kişinin satırını hafifçe vurgula */
@@ -335,10 +347,10 @@ tr.sirdaki-satir td:first-child { padding-left: 11px; }
   text-align: center;
 }
 .yaklasan-gun { font-size: 10.5px; color: var(--metin-soluk); font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; }
-.yaklasan-isim { font-size: 12px; font-weight: 700; color: var(--lacivert); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90px; }
+.yaklasan-isim { font-size: 12px; font-weight: 700; color: var(--baslik); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90px; }
 
 /* Ana sayfa: bugünün vazifeleri özeti */
 .vazife-ozet-izgara { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
 .vazife-ozet-kart { background: var(--yuzey); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
 .vazife-ozet-liste { font-size: 12px; color: var(--metin-soluk); font-weight: 600; margin-bottom: 4px; }
-.vazife-ozet-kisi { font-size: 16px; font-weight: 800; color: var(--lacivert); }
+.vazife-ozet-kisi { font-size: 16px; font-weight: 800; color: var(--baslik); }

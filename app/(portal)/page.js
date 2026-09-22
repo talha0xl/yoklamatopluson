@@ -11,50 +11,6 @@ function bugun() {
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 }
 
-async function yoklamaOzetiGetir(supabase, tarih) {
-  const { count: toplamOgrenci } = await supabase
-    .from("ogrenciler")
-    .select("id", { count: "exact", head: true })
-    .eq("aktif", true);
-  const { data: tur } = await supabase
-    .from("yoklama_turleri")
-    .select("id")
-    .eq("isim", "Günlük Yoklama")
-    .maybeSingle();
-  if (!tur || !toplamOgrenci) return null;
-  const { count: geldi } = await supabase
-    .from("yoklama")
-    .select("id", { count: "exact", head: true })
-    .eq("tarih", tarih)
-    .eq("tur_id", tur.id)
-    .eq("durum", "geldi");
-  return { geldi: geldi || 0, toplam: toplamOgrenci };
-}
-
-async function namazOzetiGetir(supabase, tarih) {
-  const { count: toplamOgrenci } = await supabase
-    .from("ogrenciler")
-    .select("id", { count: "exact", head: true })
-    .eq("aktif", true);
-  if (!toplamOgrenci) return null;
-  const [{ count: kildi }, { count: izinli }] = await Promise.all([
-    supabase
-      .from("namaz_yoklama")
-      .select("id", { count: "exact", head: true })
-      .eq("tarih", tarih)
-      .in("durum", ["kildi", "gec_kildi"]),
-    supabase
-      .from("namaz_yoklama")
-      .select("id", { count: "exact", head: true })
-      .eq("tarih", tarih)
-      .eq("durum", "izinli"),
-  ]);
-  // İzinli olan vakitler "kılınmadı" gibi sayılıp oranı düşürmesin diye
-  // toplam mümkün vakitten düşülüyor.
-  const toplamMumkun = Math.max(0, toplamOgrenci * 5 - (izinli || 0));
-  return { kildi: kildi || 0, toplamMumkun };
-}
-
 async function tekVazifeGetir(supabase, liste, tarih) {
   const [{ data: kisiler }, { data: gruplar }] = await Promise.all([
     supabase.from("gorev_kisileri").select("*").eq("aktif", true).eq("liste_id", liste.id).order("sira"),
@@ -78,19 +34,10 @@ async function vazifelerGetir(supabase, tarih) {
 async function ozetVerileriGetir(session) {
   const supabase = supabaseServer();
   const tarih = bugun();
-  const ozet = { yoklama: null, namaz: null, vazifeler: [] };
-
-  const [yoklamaSonuc, namazSonuc, vazifeSonuc] = await Promise.all([
-    modulErisimVarMi(session, "duz_yoklama") ? yoklamaOzetiGetir(supabase, tarih).catch(() => null) : Promise.resolve(null),
-    modulErisimVarMi(session, "namaz_yoklama") ? namazOzetiGetir(supabase, tarih).catch(() => null) : Promise.resolve(null),
-    modulErisimVarMi(session, "gorev_listeleri") ? vazifelerGetir(supabase, tarih).catch(() => []) : Promise.resolve([]),
-  ]);
-
-  ozet.yoklama = yoklamaSonuc;
-  ozet.namaz = namazSonuc;
-  ozet.vazifeler = vazifeSonuc || [];
-
-  return ozet;
+  const vazifeSonuc = modulErisimVarMi(session, "gorev_listeleri")
+    ? await vazifelerGetir(supabase, tarih).catch(() => [])
+    : [];
+  return { vazifeler: vazifeSonuc || [] };
 }
 
 export default async function Anasayfa() {
@@ -137,41 +84,7 @@ export default async function Anasayfa() {
           </div>
         )}
       </div>
-
-      {(ozet.yoklama || ozet.namaz) && (
-        <>
-          <div className="ozet-baslik" style={{ marginTop: 22 }}>Bugünün özeti</div>
-          <div className="ozet-izgara">
-            {ozet.yoklama && (
-              <OzetKart
-                deger={`${ozet.yoklama.geldi} / ${ozet.yoklama.toplam}`}
-                etiket="Bugün Yoklama'da geldi"
-                oran={ozet.yoklama.toplam ? Math.round((ozet.yoklama.geldi / ozet.yoklama.toplam) * 100) : 0}
-              />
-            )}
-            {ozet.namaz && (
-              <OzetKart
-                deger={`%${ozet.namaz.toplamMumkun ? Math.round((ozet.namaz.kildi / ozet.namaz.toplamMumkun) * 100) : 0}`}
-                etiket="Bugün namaz tamamlanma oranı"
-                oran={ozet.namaz.toplamMumkun ? Math.round((ozet.namaz.kildi / ozet.namaz.toplamMumkun) * 100) : 0}
-              />
-            )}
-          </div>
-        </>
-      )}
     </>
-  );
-}
-
-function OzetKart({ deger, etiket, oran }) {
-  return (
-    <div className="ozet-kart">
-      <div className="ozet-deger">{deger}</div>
-      <div className="ozet-etiket">{etiket}</div>
-      <div className="ozet-cubuk-sarma">
-        <div className="ozet-cubuk" style={{ width: `${Math.min(100, Math.max(0, oran))}%` }} />
-      </div>
-    </div>
   );
 }
 
@@ -199,7 +112,7 @@ function ModulKart({ modul, pasif }) {
 }
 
 function ModulSimgesi({ anahtar }) {
-  const stil = { width: 22, height: 22, stroke: "var(--lacivert)", fill: "none", strokeWidth: 1.8 };
+  const stil = { width: 22, height: 22, stroke: "var(--baslik)", fill: "none", strokeWidth: 1.8 };
   if (anahtar === "duz_yoklama")
     return (
       <svg viewBox="0 0 24 24" style={stil}>

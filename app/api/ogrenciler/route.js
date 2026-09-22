@@ -4,33 +4,43 @@ import { supabaseServer } from "../../../lib/supabaseServer";
 export async function GET(req) {
   const grupId = req.nextUrl.searchParams.get("grup_id");
   const supabase = supabaseServer();
-  let q = supabase.from("ogrenciler").select("*").eq("aktif", true).order("ad_soyad");
+  let q = supabase.from("ogrenciler").select("*, ogrenci_yakinlari(*)").eq("aktif", true).order("ad_soyad");
   if (grupId) q = q.eq("grup_id", grupId);
   const { data, error } = await q;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ogrenciler: data });
 }
 
+// POST { ad_soyad, grup_id, yasadigi_yer, yakinlar: [{ yakinlik, ad_soyad, telefon, meslek, yasadigi_yer }] }
 export async function POST(req) {
   const body = await req.json();
   const supabase = supabaseServer();
-  const { data, error } = await supabase
+  const { data: ogrenci, error } = await supabase
     .from("ogrenciler")
     .insert({
       ad_soyad: body.ad_soyad,
       grup_id: body.grup_id,
-      anne_adi: body.anne_adi || null,
-      anne_telefon: body.anne_telefon || null,
-      anne_meslek: body.anne_meslek || null,
-      baba_adi: body.baba_adi || null,
-      baba_telefon: body.baba_telefon || null,
-      baba_meslek: body.baba_meslek || null,
-      diger_yakin_yakinlik: body.diger_yakin_yakinlik || null,
-      diger_yakin_adi: body.diger_yakin_adi || null,
-      diger_yakin_telefon: body.diger_yakin_telefon || null,
+      yasadigi_yer: body.yasadigi_yer || null,
     })
     .select()
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ogrenci: data });
+
+  const yakinlar = (body.yakinlar || []).filter((y) => y.yakinlik?.trim());
+  if (yakinlar.length) {
+    const { error: e2 } = await supabase.from("ogrenci_yakinlari").insert(
+      yakinlar.map((y, i) => ({
+        ogrenci_id: ogrenci.id,
+        yakinlik: y.yakinlik.trim(),
+        ad_soyad: y.ad_soyad || null,
+        telefon: y.telefon || null,
+        meslek: y.meslek || null,
+        yasadigi_yer: y.yasadigi_yer || null,
+        siralama: i,
+      }))
+    );
+    if (e2) return NextResponse.json({ error: `Öğrenci eklendi ama yakınlar kaydedilemedi: ${e2.message}` }, { status: 500 });
+  }
+
+  return NextResponse.json({ ogrenci });
 }
