@@ -19,8 +19,15 @@ export async function POST(req) {
     .insert({
       ad_soyad: body.ad_soyad,
       grup_id: body.grup_id,
-      veli_adi: body.veli_adi || null,
-      veli_telefon: body.veli_telefon || null,
+      anne_adi: body.anne_adi || null,
+      anne_telefon: body.anne_telefon || null,
+      anne_meslek: body.anne_meslek || null,
+      baba_adi: body.baba_adi || null,
+      baba_telefon: body.baba_telefon || null,
+      baba_meslek: body.baba_meslek || null,
+      diger_yakin_yakinlik: body.diger_yakin_yakinlik || null,
+      diger_yakin_adi: body.diger_yakin_adi || null,
+      diger_yakin_telefon: body.diger_yakin_telefon || null,
     })
     .select()
     .single();

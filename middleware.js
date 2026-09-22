@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { verifySession } from "./lib/session";
-import { yolIcinModul, modulErisimVarMi } from "./lib/moduller";
+import { yolIcinModul, modulErisimVarMi, istatistikErisimVarMi, mesajErisimVarMi } from "./lib/moduller";
 
 export async function middleware(req) {
   const { pathname } = req.nextUrl;
@@ -28,6 +28,19 @@ export async function middleware(req) {
 
   // Sadece admin olanlar /admin sayfasına girebilsin
   if (pathname.startsWith("/admin") && !session.admin) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/";
+    return NextResponse.redirect(url);
+  }
+
+  // İstatistik ve Veli Bilgilendirme birden fazla modülün verisini
+  // gösteriyor, bu yüzden ayrı ayrı (daha geniş) kontrol ediliyor.
+  if (pathname.startsWith("/istatistik") && !istatistikErisimVarMi(session)) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/";
+    return NextResponse.redirect(url);
+  }
+  if (pathname.startsWith("/mesaj") && !mesajErisimVarMi(session)) {
     const url = req.nextUrl.clone();
     url.pathname = "/";
     return NextResponse.redirect(url);

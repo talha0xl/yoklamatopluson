@@ -37,12 +37,22 @@ async function namazOzetiGetir(supabase, tarih) {
     .select("id", { count: "exact", head: true })
     .eq("aktif", true);
   if (!toplamOgrenci) return null;
-  const { count: kildi } = await supabase
-    .from("namaz_yoklama")
-    .select("id", { count: "exact", head: true })
-    .eq("tarih", tarih)
-    .in("durum", ["kildi", "gec_kildi"]);
-  return { kildi: kildi || 0, toplamMumkun: toplamOgrenci * 5 };
+  const [{ count: kildi }, { count: izinli }] = await Promise.all([
+    supabase
+      .from("namaz_yoklama")
+      .select("id", { count: "exact", head: true })
+      .eq("tarih", tarih)
+      .in("durum", ["kildi", "gec_kildi"]),
+    supabase
+      .from("namaz_yoklama")
+      .select("id", { count: "exact", head: true })
+      .eq("tarih", tarih)
+      .eq("durum", "izinli"),
+  ]);
+  // İzinli olan vakitler "kılınmadı" gibi sayılıp oranı düşürmesin diye
+  // toplam mümkün vakitten düşülüyor.
+  const toplamMumkun = Math.max(0, toplamOgrenci * 5 - (izinli || 0));
+  return { kildi: kildi || 0, toplamMumkun };
 }
 
 async function tekVazifeGetir(supabase, liste, tarih) {
@@ -135,7 +145,7 @@ export default async function Anasayfa() {
             {ozet.yoklama && (
               <OzetKart
                 deger={`${ozet.yoklama.geldi} / ${ozet.yoklama.toplam}`}
-                etiket="Bugün Yurt Yoklama'da geldi"
+                etiket="Bugün Yoklama'da geldi"
                 oran={ozet.yoklama.toplam ? Math.round((ozet.yoklama.geldi / ozet.yoklama.toplam) * 100) : 0}
               />
             )}

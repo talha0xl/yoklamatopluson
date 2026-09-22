@@ -11,7 +11,7 @@ function ayBasi() {
 }
 
 const KAYNAKLAR = [
-  { anahtar: "yoklama", isim: "Yurt Yoklama" },
+  { anahtar: "yoklama", isim: "Yoklama" },
   { anahtar: "namaz", isim: "Namaz Yoklama" },
   { anahtar: "gorev", isim: "Görev Listeleri" },
 ];
@@ -62,16 +62,33 @@ export default function IstatistikIstemci({ baslangicGruplar, baslangicTurler, b
 
   useEffect(() => getir(), [getir]);
 
-  const genelToplam = sonuc.reduce((a, s) => a + s.toplam, 0);
-  const genelGeldi = sonuc.reduce((a, s) => a + s.geldi, 0);
-  const genelOran = genelToplam ? Math.round((genelGeldi / genelToplam) * 100) : null;
+  const genelPayda = sonuc.reduce((a, s) => a + (s.payda ?? s.toplam), 0);
+  const genelBasari = sonuc.reduce((a, s) => a + (s.basari ?? s.geldi), 0);
+  const genelOran = genelPayda ? Math.round((genelBasari / genelPayda) * 100) : null;
 
+  // sutunlar: tablodaki her ek sütunun başlığı ve o satırdaki hangi alandan
+  // okunacağı. "Kişi/Öğrenci" ve oran sütunu ayrıca, sabit olarak eklenir.
   const basliklar =
     kaynak === "namaz"
-      ? { ilk: "Kıldı", ikinci: "Geç Kıldı", ucuncu: "Kılmadı", oranEtiket: "Kılma oranı" }
+      ? {
+          sutunlar: [
+            { baslik: "Kıldı", alan: "geldi" },
+            { baslik: "Geç Kıldı", alan: "gecKildi" },
+            { baslik: "İzinli", alan: "izinli" },
+            { baslik: "Kılmadı", alan: "izinsiz" },
+          ],
+          oranEtiket: "Kılma oranı",
+        }
       : kaynak === "gorev"
-      ? { ilk: "Vazifeli olduğu gün", ikinci: null, ucuncu: null, oranEtiket: "Aralığın yüzdesi" }
-      : { ilk: "Geldi", ikinci: "İzinli", ucuncu: "İzinsiz", oranEtiket: "Devam oranı" };
+      ? { sutunlar: [{ baslik: "Vazifeli olduğu gün", alan: "geldi" }], oranEtiket: "Aralığın yüzdesi" }
+      : {
+          sutunlar: [
+            { baslik: "Geldi", alan: "geldi" },
+            { baslik: "İzinli", alan: "izinli" },
+            { baslik: "İzinsiz", alan: "izinsiz" },
+          ],
+          oranEtiket: "Devam oranı",
+        };
 
   const gosterilenSonuc = kisiAra.trim()
     ? sonuc.filter((s) => s.ogrenci.ad_soyad.toLocaleLowerCase("tr").includes(kisiAra.trim().toLocaleLowerCase("tr")))
@@ -173,9 +190,9 @@ export default function IstatistikIstemci({ baslangicGruplar, baslangicTurler, b
               <thead>
                 <tr>
                   <th>{kaynak === "gorev" ? "Kişi" : "Öğrenci"}</th>
-                  <th>{basliklar.ilk}</th>
-                  {basliklar.ikinci && <th>{basliklar.ikinci}</th>}
-                  {basliklar.ucuncu && <th>{basliklar.ucuncu}</th>}
+                  {basliklar.sutunlar.map((su) => (
+                    <th key={su.alan}>{su.baslik}</th>
+                  ))}
                   <th style={{ width: 160 }}>{basliklar.oranEtiket}</th>
                 </tr>
               </thead>
@@ -183,9 +200,9 @@ export default function IstatistikIstemci({ baslangicGruplar, baslangicTurler, b
                 {gosterilenSonuc.map((s) => (
                   <tr key={s.ogrenci.id}>
                     <td style={{ fontWeight: 600 }}>{s.ogrenci.ad_soyad}</td>
-                    <td>{s.geldi}</td>
-                    {basliklar.ikinci && <td>{s.izinli}</td>}
-                    {basliklar.ucuncu && <td>{s.izinsiz}</td>}
+                    {basliklar.sutunlar.map((su) => (
+                      <td key={su.alan}>{s[su.alan]}</td>
+                    ))}
                     <td>
                       {s.oran === null ? (
                         <span style={{ color: "var(--metin-soluk)" }}>Kayıt yok</span>

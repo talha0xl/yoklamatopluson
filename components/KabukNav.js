@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import CikisButonu from "./CikisButonu";
 
-export default function KabukNav({ modulLinkleri, duzYoklamaVarMi, isAdmin, sahipAdi }) {
+export default function KabukNav({ modulLinkleri, istatistikVarMi, mesajVarMi, isAdmin, sahipAdi }) {
   const yol = usePathname();
 
   return (
@@ -23,15 +23,15 @@ export default function KabukNav({ modulLinkleri, duzYoklamaVarMi, isAdmin, sahi
             {m.altYazi ? <span className="menu-rozet">{m.altYazi}</span> : null}
           </Link>
         ))}
-        {duzYoklamaVarMi && (
-          <>
-            <Link href="/istatistik" className={yol === "/istatistik" ? "aktif" : ""}>
-              İstatistik
-            </Link>
-            <Link href="/mesaj" className={yol === "/mesaj" ? "aktif" : ""}>
-              Veli Bilgilendirme
-            </Link>
-          </>
+        {istatistikVarMi && (
+          <Link href="/istatistik" className={yol === "/istatistik" ? "aktif" : ""}>
+            İstatistik
+          </Link>
+        )}
+        {mesajVarMi && (
+          <Link href="/mesaj" className={yol === "/mesaj" ? "aktif" : ""}>
+            Veli Bilgilendirme
+          </Link>
         )}
         {isAdmin && (
           <Link href="/admin" className={yol === "/admin" ? "aktif" : ""}>

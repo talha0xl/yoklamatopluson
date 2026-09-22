@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
+import { useAraliklaTazele } from "../../../lib/useAraliklaTazele";
 
 const VAKITLER = [
   { anahtar: "sabah", etiket: "Sabah" },
@@ -34,21 +35,27 @@ export default function NamazYoklamaIstemci({ baslangicGruplar }) {
   const [yukleniyor, setYukleniyor] = useState(true);
   const [kaydedenId, setKaydedenId] = useState(null);
 
-  const veriGetir = useCallback(() => {
-    if (!grupId || !tarih) return;
-    setYukleniyor(true);
-    fetch(`/api/namaz-yoklama?grup_id=${grupId}&tarih=${tarih}`)
-      .then((r) => r.json())
-      .then((d) => {
-        setOgrenciler(d.ogrenciler || []);
-        const map = {};
-        (d.kayitlar || []).forEach((k) => (map[`${k.ogrenci_id}:${k.vakit}`] = k));
-        setKayitMap(map);
-        setYukleniyor(false);
-      });
-  }, [grupId, tarih]);
+  const tazele = useCallback(
+    (sessiz) => {
+      if (!grupId || !tarih) return;
+      if (!sessiz) setYukleniyor(true);
+      fetch(`/api/namaz-yoklama?grup_id=${grupId}&tarih=${tarih}`)
+        .then((r) => r.json())
+        .then((d) => {
+          setOgrenciler(d.ogrenciler || []);
+          const map = {};
+          (d.kayitlar || []).forEach((k) => (map[`${k.ogrenci_id}:${k.vakit}`] = k));
+          setKayitMap(map);
+          if (!sessiz) setYukleniyor(false);
+        });
+    },
+    [grupId, tarih]
+  );
 
-  useEffect(() => veriGetir(), [veriGetir]);
+  useEffect(() => tazele(false), [tazele]);
+  // Sekme açıkken arka planda birkaç saniyede bir sessizce tazeler, böylece
+  // başka bir hocanın az önce işaretlediği bir kayıt da kısa sürede görünür.
+  useAraliklaTazele(() => tazele(true));
 
   async function isaretle(ogrenciId, durum) {
     setKaydedenId(ogrenciId);
@@ -75,8 +82,9 @@ export default function NamazYoklamaIstemci({ baslangicGruplar }) {
 
   const kildiSayisi = ogrenciler.filter((o) => kayitMap[`${o.id}:${vakit}`]?.durum === "kildi").length;
   const gecKildiSayisi = ogrenciler.filter((o) => kayitMap[`${o.id}:${vakit}`]?.durum === "gec_kildi").length;
+  const izinliSayisi = ogrenciler.filter((o) => kayitMap[`${o.id}:${vakit}`]?.durum === "izinli").length;
   const kilmadiSayisi = ogrenciler.filter((o) => kayitMap[`${o.id}:${vakit}`]?.durum === "kilmadi").length;
-  const isaretsizSayisi = ogrenciler.length - kildiSayisi - gecKildiSayisi - kilmadiSayisi;
+  const isaretsizSayisi = ogrenciler.length - kildiSayisi - gecKildiSayisi - izinliSayisi - kilmadiSayisi;
 
   return (
     <>
@@ -91,7 +99,7 @@ export default function NamazYoklamaIstemci({ baslangicGruplar }) {
           max={bugun()}
         />
       </div>
-      <p className="sayfa-alt">Önce vakti seçin, sonra isme göre Kıldı / Geç Kıldı / Kılmadı'ya tek dokunuşla işaretleyin.</p>
+      <p className="sayfa-alt">Önce vakti seçin, sonra isme göre Kıldı / Geç Kıldı / İzinli / Kılmadı'ya tek dokunuşla işaretleyin.</p>
 
       <label className="etiket" style={{ marginBottom: 6, display: "block" }}>Vakit</label>
       <div className="grup-sekme">
@@ -115,6 +123,7 @@ export default function NamazYoklamaIstemci({ baslangicGruplar }) {
         <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap" }}>
           <span className="rozet rozet-yesil">{kildiSayisi} kıldı</span>
           <span className="rozet rozet-amber">{gecKildiSayisi} geç kıldı</span>
+          <span className="rozet rozet-mavi">{izinliSayisi} izinli</span>
           <span className="rozet rozet-kirmizi">{kilmadiSayisi} kılmadı</span>
           <span className="rozet rozet-gri">{isaretsizSayisi} işaretsiz</span>
         </div>
@@ -138,6 +147,7 @@ export default function NamazYoklamaIstemci({ baslangicGruplar }) {
                     <div className="ogrenci-detay">
                       {durum === "kildi" && <>Kıldı olarak işaretlendi</>}
                       {durum === "gec_kildi" && <>Geç kıldı olarak işaretlendi</>}
+                      {durum === "izinli" && <>İzinli olarak işaretlendi</>}
                       {durum === "kilmadi" && <>Kılmadı olarak işaretlendi</>}
                       {!durum && <>Henüz işaretlenmedi</>}
                     </div>
@@ -157,6 +167,13 @@ export default function NamazYoklamaIstemci({ baslangicGruplar }) {
                       onClick={() => isaretle(o.id, "gec_kildi")}
                     >
                       Geç Kıldı
+                    </button>
+                    <button
+                      className={`durum-btn ${durum === "izinli" ? "secili-mavi" : ""}`}
+                      disabled={kaydedenId === o.id}
+                      onClick={() => isaretle(o.id, "izinli")}
+                    >
+                      İzinli
                     </button>
                     <button
                       className={`durum-btn ${durum === "kilmadi" ? "secili-izinsiz" : ""}`}

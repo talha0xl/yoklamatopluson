@@ -6,6 +6,26 @@ function bugun() {
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 }
 
+// Bir öğrencinin kayıtlı yakınlarından (anne/baba/diğer) telefonu olanları
+// tek tek listeler — her biri kendi WhatsApp bağlantısını alır. Eski
+// (v8 öncesi) kayıtlarda tek "veli" alanı varsa ona geri düşer.
+function ogrenciKontaklari(o) {
+  const kontaklar = [];
+  if (o.anne_telefon) kontaklar.push({ etiket: "Anne", ad: o.anne_adi || "Anne", telefon: o.anne_telefon });
+  if (o.baba_telefon) kontaklar.push({ etiket: "Baba", ad: o.baba_adi || "Baba", telefon: o.baba_telefon });
+  if (o.diger_yakin_telefon) {
+    kontaklar.push({
+      etiket: o.diger_yakin_yakinlik || "Diğer",
+      ad: o.diger_yakin_adi || o.diger_yakin_yakinlik || "Yakını",
+      telefon: o.diger_yakin_telefon,
+    });
+  }
+  if (!kontaklar.length && o.veli_telefon) {
+    kontaklar.push({ etiket: "Veli", ad: o.veli_adi || "Veli", telefon: o.veli_telefon });
+  }
+  return kontaklar;
+}
+
 function whatsappNumarasi(tel) {
   if (!tel) return null;
   let t = tel.replace(/[^0-9]/g, ""); // sadece rakamlar
@@ -16,13 +36,13 @@ function whatsappNumarasi(tel) {
 }
 
 const KAYNAKLAR = [
-  { anahtar: "yoklama", isim: "Yurt Yoklama" },
+  { anahtar: "yoklama", isim: "Yoklama" },
   { anahtar: "namaz", isim: "Namaz Yoklama" },
 ];
 
 const VAKIT_ETIKET = { sabah: "Sabah", ogle: "Öğle", ikindi: "İkindi", aksam: "Akşam", yatsi: "Yatsı" };
 const VAKIT_SIRA = ["sabah", "ogle", "ikindi", "aksam", "yatsi"];
-const NAMAZ_DURUM_ETIKET = { kildi: "Kıldı", gec_kildi: "Geç Kıldı", kilmadi: "Kılmadı" };
+const NAMAZ_DURUM_ETIKET = { kildi: "Kıldı", gec_kildi: "Geç Kıldı", izinli: "İzinli", kilmadi: "Kılmadı" };
 
 const VARSAYILAN_SABLON_YOKLAMA =
   "Sayın {veli}, {ogrenci} adlı öğrencimizin {tarih} tarihli {tur} durumu: {durum}. Bilginize sunarız. Yavuztürk Süleymaniye Yurdu";
@@ -98,8 +118,8 @@ export default function MesajIstemci({ baslangicGruplar, baslangicTurler }) {
   }
 
   const hedefListe = ogrenciler
-    .filter((o) => o.veli_telefon)
-    .map((o) => ({ ogrenci: o, kayit: kayitMap[o.id] }))
+    .map((o) => ({ ogrenci: o, kayit: kayitMap[o.id], kontaklar: ogrenciKontaklari(o) }))
+    .filter(({ kontaklar }) => kontaklar.length > 0)
     .filter(({ kayit }) => {
       if (kaynak === "namaz") {
         const kayitlar = kayit || [];
@@ -110,10 +130,10 @@ export default function MesajIstemci({ baslangicGruplar, baslangicTurler }) {
       return kayit?.durum === durumFiltre;
     });
 
-  function mesajUret(ogrenci, kayit) {
+  function mesajUret(ogrenci, kayit, kontakAdi) {
     const durumMetni = kaynak === "namaz" ? namazOzeti(kayit) : kayit ? durumEtiketYoklama[kayit.durum] : "İşaretlenmedi";
     return sablon
-      .replaceAll("{veli}", ogrenci.veli_adi || "Veli")
+      .replaceAll("{veli}", kontakAdi || "Veli")
       .replaceAll("{ogrenci}", ogrenci.ad_soyad)
       .replaceAll("{tarih}", tarih.split("-").reverse().join("."))
       .replaceAll("{tur}", seciliTur?.isim || "yoklama")
@@ -179,6 +199,7 @@ export default function MesajIstemci({ baslangicGruplar, baslangicTurler }) {
                     <select className="girdi" value={durumFiltre} onChange={(e) => setDurumFiltre(e.target.value)}>
                       <option value="kilmadi">En az bir vakti kılmayanlar</option>
                       <option value="gec_kildi">Geç kılanı olanlar</option>
+                      <option value="izinli">İzinli olanlar</option>
                       <option value="hepsi">Bugün işaretlenen herkes</option>
                     </select>
                   ) : (
@@ -215,24 +236,26 @@ export default function MesajIstemci({ baslangicGruplar, baslangicTurler }) {
                 <div className="bos-durum">Bu filtreye uyan, telefonu kayıtlı öğrenci yok.</div>
               )}
               {!yukleniyor &&
-                hedefListe.map(({ ogrenci, kayit }) => {
-                  const numara = whatsappNumarasi(ogrenci.veli_telefon);
-                  const metin = mesajUret(ogrenci, kayit);
-                  const link = numara ? `https://wa.me/${numara}?text=${encodeURIComponent(metin)}` : null;
-                  return (
-                    <div className="ogrenci-satir" key={ogrenci.id}>
-                      <div>
-                        <div className="ogrenci-ad">{ogrenci.ad_soyad}</div>
-                        <div className="ogrenci-detay">
-                          {ogrenci.veli_adi || "Veli"} · {ogrenci.veli_telefon}
+                hedefListe.map(({ ogrenci, kayit, kontaklar }) =>
+                  kontaklar.map((kontak) => {
+                    const numara = whatsappNumarasi(kontak.telefon);
+                    const metin = mesajUret(ogrenci, kayit, kontak.ad);
+                    const link = numara ? `https://wa.me/${numara}?text=${encodeURIComponent(metin)}` : null;
+                    return (
+                      <div className="ogrenci-satir" key={`${ogrenci.id}:${kontak.etiket}`}>
+                        <div>
+                          <div className="ogrenci-ad">{ogrenci.ad_soyad}</div>
+                          <div className="ogrenci-detay">
+                            {kontak.etiket}: {kontak.ad} · {kontak.telefon}
+                          </div>
                         </div>
+                        <a href={link} target="_blank" rel="noopener noreferrer" className="btn btn-yesil btn-sm">
+                          WhatsApp'ta gönder
+                        </a>
                       </div>
-                      <a href={link} target="_blank" rel="noopener noreferrer" className="btn btn-yesil btn-sm">
-                        WhatsApp'ta gönder
-                      </a>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
             </div>
           </div>
         </>

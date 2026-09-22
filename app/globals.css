@@ -9,6 +9,7 @@
   --gri-acik: #f4f4f3;
   --kirmizi: #b3413b;       /* izinsiz için, palet dışı ama uyumlu */
   --amber: #c98a2c;         /* izinli için */
+  --mavi: #2f6f8f;          /* namaz yoklamada izinli için, geç kıldı (amber) ile karışmasın diye */
   --beyaz: #ffffff;
   --metin: #202634;
   --metin-soluk: #6b7280;
@@ -169,6 +170,7 @@ input, select, textarea { font-family: inherit; }
 .rozet-kirmizi { background: #fbeceb; color: var(--kirmizi); }
 .rozet-amber { background: #faf1e2; color: var(--amber); }
 .rozet-gri { background: var(--gri-acik); color: var(--metin-soluk); }
+.rozet-mavi { background: #e8f0f4; color: var(--mavi); }
 
 table { width: 100%; border-collapse: collapse; }
 th { text-align: left; font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--metin-soluk); padding: 10px 14px; border-bottom: 1.5px solid var(--border); }
@@ -191,7 +193,7 @@ tr:last-child td { border-bottom: none; }
 .ogrenci-satir:last-child { border-bottom: none; }
 .ogrenci-ad { font-weight: 600; font-size: 15px; }
 .ogrenci-detay { font-size: 13px; color: var(--metin-soluk); margin-top: 2px; }
-.durum-btn-grup { display: flex; gap: 8px; }
+.durum-btn-grup { display: flex; gap: 8px; flex-wrap: wrap; }
 .durum-btn {
   padding: 9px 16px; border-radius: 10px; border: 1.5px solid var(--border); background: #fff;
   font-weight: 700; font-size: 13.5px; color: var(--metin-soluk); display: flex; align-items: center; gap: 6px;
@@ -199,6 +201,7 @@ tr:last-child td { border-bottom: none; }
 .durum-btn.secili-geldi { background: var(--yesil); border-color: var(--yesil); color: #fff; }
 .durum-btn.secili-izinli { background: var(--amber); border-color: var(--amber); color: #fff; }
 .durum-btn.secili-izinsiz { background: var(--kirmizi); border-color: var(--kirmizi); color: #fff; }
+.durum-btn.secili-mavi { background: var(--mavi); border-color: var(--mavi); color: #fff; }
 
 .login-sarma { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--lacivert); padding: 20px; }
 .login-kart { width: 100%; max-width: 380px; background: #fff; border-radius: 20px; padding: 40px 32px; box-shadow: 0 20px 60px rgba(0,0,0,0.35); }

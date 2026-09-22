@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { verifySession } from "../lib/session";
-import { MODULLER, modulErisimVarMi } from "../lib/moduller";
+import { MODULLER, modulErisimVarMi, istatistikErisimVarMi, mesajErisimVarMi } from "../lib/moduller";
 import KabukNav from "./KabukNav";
 
 // Kabuk artık kök layout'ta BİR KEZ render ediliyor (sayfa geçişlerinde yeniden
@@ -15,13 +15,12 @@ export default async function Kabuk({ children }) {
     (m) => (m.hazir || session?.admin) && modulErisimVarMi(session, m.anahtar)
   ).map((m) => ({ href: m.yol, etiket: m.isim, altYazi: m.hazir ? null : "yapım aşamasında" }));
 
-  const duzYoklamaVarMi = modulErisimVarMi(session, "duz_yoklama");
-
   return (
     <div className="kabuk">
       <KabukNav
         modulLinkleri={modulLinkleri}
-        duzYoklamaVarMi={duzYoklamaVarMi}
+        istatistikVarMi={istatistikErisimVarMi(session)}
+        mesajVarMi={mesajErisimVarMi(session)}
         isAdmin={!!session?.admin}
         sahipAdi={session?.sahip_adi || null}
       />

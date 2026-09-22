@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
+import { useAraliklaTazele } from "../../../lib/useAraliklaTazele";
 
 function bugun() {
   const d = new Date();
@@ -30,21 +31,27 @@ export default function YoklamaIstemci({ isAdmin, baslangicTurler, baslangicGrup
       });
   }, []);
 
-  const veriGetir = useCallback(() => {
-    if (!grupId || !tarih || !turId) return;
-    setYukleniyor(true);
-    fetch(`/api/yoklama?grup_id=${grupId}&tarih=${tarih}&tur_id=${turId}`)
-      .then((r) => r.json())
-      .then((d) => {
-        setOgrenciler(d.ogrenciler || []);
-        const map = {};
-        (d.kayitlar || []).forEach((k) => (map[k.ogrenci_id] = k));
-        setKayitMap(map);
-        setYukleniyor(false);
-      });
-  }, [grupId, tarih, turId]);
+  const veriGetir = useCallback(
+    (sessiz) => {
+      if (!grupId || !tarih || !turId) return;
+      if (!sessiz) setYukleniyor(true);
+      fetch(`/api/yoklama?grup_id=${grupId}&tarih=${tarih}&tur_id=${turId}`)
+        .then((r) => r.json())
+        .then((d) => {
+          setOgrenciler(d.ogrenciler || []);
+          const map = {};
+          (d.kayitlar || []).forEach((k) => (map[k.ogrenci_id] = k));
+          setKayitMap(map);
+          if (!sessiz) setYukleniyor(false);
+        });
+    },
+    [grupId, tarih, turId]
+  );
 
-  useEffect(() => veriGetir(), [veriGetir]);
+  useEffect(() => veriGetir(false), [veriGetir]);
+  // Sekme açıkken arka planda birkaç saniyede bir sessizce tazeler, böylece
+  // başka bir hocanın az önce işaretlediği bir kayıt da kısa sürede görünür.
+  useAraliklaTazele(() => veriGetir(true));
 
   async function isaretle(ogrenciId, durum) {
     setKaydedenId(ogrenciId);

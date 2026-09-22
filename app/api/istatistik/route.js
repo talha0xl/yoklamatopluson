@@ -57,6 +57,8 @@ export async function GET(req) {
         izinli: 0,
         izinsiz: 0,
         toplam: toplamGun,
+        basari: gunSayisi,
+        payda: toplamGun,
         oran: toplamGun ? Math.round((gunSayisi / toplamGun) * 100) : null,
       };
     });
@@ -83,15 +85,20 @@ export async function GET(req) {
       const kOgr = kayitlar.filter((k) => k.ogrenci_id === o.id);
       const kildi = kOgr.filter((k) => k.durum === "kildi").length;
       const gecKildi = kOgr.filter((k) => k.durum === "gec_kildi").length;
+      const izinli = kOgr.filter((k) => k.durum === "izinli").length;
       const kilmadi = kOgr.filter((k) => k.durum === "kilmadi").length;
-      const toplam = kOgr.length;
+      // İzinli olunan vakitler oranı düşürmesin diye paydadan çıkarılıyor.
+      const paydaGun = kOgr.length - izinli;
       return {
         ogrenci: o,
-        geldi: kildi, // ortak arayüz için aynı alan adları kullanılıyor
-        izinli: gecKildi, // "geç kıldı"
+        geldi: kildi,
+        gecKildi,
+        izinli,
         izinsiz: kilmadi,
-        toplam,
-        oran: toplam ? Math.round(((kildi + gecKildi) / toplam) * 100) : null,
+        toplam: kOgr.length,
+        basari: kildi + gecKildi,
+        payda: paydaGun,
+        oran: paydaGun > 0 ? Math.round(((kildi + gecKildi) / paydaGun) * 100) : null,
       };
     });
     return NextResponse.json({ sonuc });
@@ -121,6 +128,8 @@ export async function GET(req) {
       izinli,
       izinsiz,
       toplam,
+      basari: geldi,
+      payda: toplam,
       oran: toplam ? Math.round((geldi / toplam) * 100) : null,
     };
   });

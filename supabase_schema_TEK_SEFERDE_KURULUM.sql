@@ -21,8 +21,17 @@ create table if not exists ogrenciler (
   id uuid primary key default gen_random_uuid(),
   ad_soyad text not null,
   grup_id uuid not null references gruplar(id) on delete cascade,
-  veli_adi text,
+  veli_adi text,            -- eski/genel alan, geriye dönük uyumluluk için duruyor
   veli_telefon text,
+  anne_adi text,
+  anne_telefon text,
+  anne_meslek text,
+  baba_adi text,
+  baba_telefon text,
+  baba_meslek text,
+  diger_yakin_yakinlik text, -- örn. "Amca", "Abla"
+  diger_yakin_adi text,
+  diger_yakin_telefon text,
   aktif boolean not null default true,
   created_at timestamptz not null default now()
 );
@@ -112,7 +121,7 @@ create table if not exists namaz_yoklama (
   ogrenci_id uuid not null references ogrenciler(id) on delete cascade,
   tarih date not null default current_date,
   vakit text not null check (vakit in ('sabah','ogle','ikindi','aksam','yatsi')),
-  durum text not null check (durum in ('kildi','gec_kildi','kilmadi')),
+  durum text not null check (durum in ('kildi','gec_kildi','izinli','kilmadi')),
   not_metni text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),

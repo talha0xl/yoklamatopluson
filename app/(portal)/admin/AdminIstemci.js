@@ -31,12 +31,42 @@ export default function AdminIstemci() {
 }
 
 /* ================= ÖĞRENCİLER ================= */
+function ogrenciVeliOzeti(o) {
+  const parcalar = [];
+  if (o.anne_adi || o.anne_telefon) {
+    parcalar.push(`Anne: ${o.anne_adi || "-"}${o.anne_meslek ? ` (${o.anne_meslek})` : ""}${o.anne_telefon ? ` · ${o.anne_telefon}` : ""}`);
+  }
+  if (o.baba_adi || o.baba_telefon) {
+    parcalar.push(`Baba: ${o.baba_adi || "-"}${o.baba_meslek ? ` (${o.baba_meslek})` : ""}${o.baba_telefon ? ` · ${o.baba_telefon}` : ""}`);
+  }
+  if (o.diger_yakin_adi || o.diger_yakin_telefon) {
+    parcalar.push(`${o.diger_yakin_yakinlik || "Diğer"}: ${o.diger_yakin_adi || "-"}${o.diger_yakin_telefon ? ` · ${o.diger_yakin_telefon}` : ""}`);
+  }
+  // Eski kayıtlarda tek "veli" alanı olabilir (v8 öncesi eklenmiş öğrenciler)
+  if (!parcalar.length && (o.veli_adi || o.veli_telefon)) {
+    parcalar.push(`Veli: ${o.veli_adi || "-"}${o.veli_telefon ? ` · ${o.veli_telefon}` : ""}`);
+  }
+  return parcalar.length ? parcalar.join("  ·  ") : "Veli bilgisi girilmemiş";
+}
+
 function OgrencilerPaneli() {
   const [gruplar, setGruplar] = useState([]);
   const [grupId, setGrupId] = useState(null);
   const [ogrenciler, setOgrenciler] = useState([]);
   const [yukleniyor, setYukleniyor] = useState(true);
-  const [form, setForm] = useState({ ad_soyad: "", veli_adi: "", veli_telefon: "" });
+  const bosForm = {
+    ad_soyad: "",
+    anne_adi: "",
+    anne_telefon: "",
+    anne_meslek: "",
+    baba_adi: "",
+    baba_telefon: "",
+    baba_meslek: "",
+    diger_yakin_yakinlik: "",
+    diger_yakin_adi: "",
+    diger_yakin_telefon: "",
+  };
+  const [form, setForm] = useState(bosForm);
   const [ekleniyor, setEkleniyor] = useState(false);
   const [hata, setHata] = useState("");
 
@@ -75,7 +105,7 @@ function OgrencilerPaneli() {
     const d = await res.json();
     setEkleniyor(false);
     if (d.error) return setHata(d.error);
-    setForm({ ad_soyad: "", veli_adi: "", veli_telefon: "" });
+    setForm(bosForm);
     getir();
   }
 
@@ -103,9 +133,7 @@ function OgrencilerPaneli() {
               <div className="ogrenci-satir" key={o.id}>
                 <div>
                   <div className="ogrenci-ad">{o.ad_soyad}</div>
-                  <div className="ogrenci-detay">
-                    {o.veli_adi || "Veli adı yok"} {o.veli_telefon ? `· ${o.veli_telefon}` : "· telefon yok"}
-                  </div>
+                  <div className="ogrenci-detay">{ogrenciVeliOzeti(o)}</div>
                 </div>
                 <button className="btn btn-tehlike btn-sm" onClick={() => sil(o.id)}>
                   Kaldır
@@ -128,21 +156,91 @@ function OgrencilerPaneli() {
                 placeholder="Örn. Ahmet Yılmaz"
               />
             </div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--lacivert)", marginTop: 4 }}>Anne</div>
             <div>
-              <label className="etiket">Veli adı</label>
+              <label className="etiket">Anne adı</label>
               <input
                 className="girdi"
-                value={form.veli_adi}
-                onChange={(e) => setForm({ ...form, veli_adi: e.target.value })}
+                value={form.anne_adi}
+                onChange={(e) => setForm({ ...form, anne_adi: e.target.value })}
+                placeholder="Örn. Ayşe Yılmaz"
+              />
+            </div>
+            <div>
+              <label className="etiket">Anne WhatsApp no</label>
+              <input
+                className="girdi"
+                value={form.anne_telefon}
+                onChange={(e) => setForm({ ...form, anne_telefon: e.target.value })}
+                placeholder="05XX XXX XX XX"
+              />
+            </div>
+            <div>
+              <label className="etiket">Anne mesleği</label>
+              <input
+                className="girdi"
+                value={form.anne_meslek}
+                onChange={(e) => setForm({ ...form, anne_meslek: e.target.value })}
+                placeholder="Örn. Öğretmen"
+              />
+            </div>
+
+            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--lacivert)", marginTop: 10 }}>Baba</div>
+            <div>
+              <label className="etiket">Baba adı</label>
+              <input
+                className="girdi"
+                value={form.baba_adi}
+                onChange={(e) => setForm({ ...form, baba_adi: e.target.value })}
                 placeholder="Örn. Mehmet Yılmaz"
               />
             </div>
             <div>
-              <label className="etiket">Veli WhatsApp no</label>
+              <label className="etiket">Baba WhatsApp no</label>
               <input
                 className="girdi"
-                value={form.veli_telefon}
-                onChange={(e) => setForm({ ...form, veli_telefon: e.target.value })}
+                value={form.baba_telefon}
+                onChange={(e) => setForm({ ...form, baba_telefon: e.target.value })}
+                placeholder="05XX XXX XX XX"
+              />
+            </div>
+            <div>
+              <label className="etiket">Baba mesleği</label>
+              <input
+                className="girdi"
+                value={form.baba_meslek}
+                onChange={(e) => setForm({ ...form, baba_meslek: e.target.value })}
+                placeholder="Örn. Esnaf"
+              />
+            </div>
+
+            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--lacivert)", marginTop: 10 }}>
+              Başka bir yakını (isteğe bağlı)
+            </div>
+            <div>
+              <label className="etiket">Yakınlığı</label>
+              <input
+                className="girdi"
+                value={form.diger_yakin_yakinlik}
+                onChange={(e) => setForm({ ...form, diger_yakin_yakinlik: e.target.value })}
+                placeholder="Örn. Amca, Abla, Dayı"
+              />
+            </div>
+            <div>
+              <label className="etiket">Adı</label>
+              <input
+                className="girdi"
+                value={form.diger_yakin_adi}
+                onChange={(e) => setForm({ ...form, diger_yakin_adi: e.target.value })}
+                placeholder="Örn. Ali Yılmaz"
+              />
+            </div>
+            <div>
+              <label className="etiket">WhatsApp no</label>
+              <input
+                className="girdi"
+                value={form.diger_yakin_telefon}
+                onChange={(e) => setForm({ ...form, diger_yakin_telefon: e.target.value })}
                 placeholder="05XX XXX XX XX"
               />
             </div>
