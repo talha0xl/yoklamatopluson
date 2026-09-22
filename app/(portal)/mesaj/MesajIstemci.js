@@ -63,10 +63,16 @@ export default function MesajIstemci({ baslangicGruplar, baslangicTurler }) {
   const [kayitMap, setKayitMap] = useState({}); // yoklama: ogrenci_id -> kayit | namaz: ogrenci_id -> [kayitlar]
   const [yukleniyor, setYukleniyor] = useState(true);
 
-  // Kaynak değişince filtre ve şablonu o kaynağa uygun varsayılana çek
+  // Kaynak değişince filtre ve şablonu o kaynağa uygun varsayılana çek.
+  // ogrenciler/kayitMap'i de HEMEN boşaltıyoruz: "namaz" kaynağında kayıt
+  // şekli dizi, "yoklama" kaynağında tek nesne — yeni veri gelene kadar eski
+  // (yanlış şekilde) veri ekranda kalırsa aşağıdaki hesaplamalar çöküyordu
+  // ("kayitlar.some is not a function").
   useEffect(() => {
     setDurumFiltre(kaynak === "namaz" ? "kilmadi" : "izinsiz");
     if (!sablonElleDegisti) setSablon(kaynak === "namaz" ? VARSAYILAN_SABLON_NAMAZ : VARSAYILAN_SABLON_YOKLAMA);
+    setOgrenciler([]);
+    setKayitMap({});
   }, [kaynak]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const getir = useCallback(() => {
@@ -107,8 +113,9 @@ export default function MesajIstemci({ baslangicGruplar, baslangicTurler }) {
 
   const durumEtiketYoklama = { geldi: "Geldi", izinli: "İzinli", izinsiz: "İzinsiz" };
 
-  function namazOzeti(kayitlar) {
-    if (!kayitlar || kayitlar.length === 0) return "İşaretlenmedi";
+  function namazOzeti(kayitlarGirdi) {
+    const kayitlar = Array.isArray(kayitlarGirdi) ? kayitlarGirdi : [];
+    if (kayitlar.length === 0) return "İşaretlenmedi";
     return VAKIT_SIRA.filter((v) => kayitlar.some((k) => k.vakit === v))
       .map((v) => {
         const k = kayitlar.find((kk) => kk.vakit === v);
@@ -122,7 +129,7 @@ export default function MesajIstemci({ baslangicGruplar, baslangicTurler }) {
     .filter(({ kontaklar }) => kontaklar.length > 0)
     .filter(({ kayit }) => {
       if (kaynak === "namaz") {
-        const kayitlar = kayit || [];
+        const kayitlar = Array.isArray(kayit) ? kayit : [];
         if (durumFiltre === "hepsi") return kayitlar.length > 0;
         return kayitlar.some((k) => k.durum === durumFiltre);
       }

@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import CikisButonu from "./CikisButonu";
+import TemaDugmesi from "./TemaDugmesi";
 
 export default function KabukNav({ modulLinkleri, istatistikVarMi, mesajVarMi, isAdmin, sahipAdi }) {
   const yol = usePathname();
@@ -39,6 +40,7 @@ export default function KabukNav({ modulLinkleri, istatistikVarMi, mesajVarMi, i
           </Link>
         )}
       </nav>
+      <TemaDugmesi />
       <CikisButonu />
       <div className="alt-bilgi">{sahipAdi ? <>Giriş: {sahipAdi}</> : null}</div>
     </aside>

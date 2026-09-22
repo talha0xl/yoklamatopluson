@@ -44,6 +44,7 @@ export async function POST(req) {
         tarih: body.tarih,
         tur_id: body.tur_id,
         durum: body.durum,
+        not_metni: body.not_metni ?? null,
         saat,
         updated_at: now.toISOString(),
       },

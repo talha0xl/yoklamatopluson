@@ -39,6 +39,7 @@ export async function POST(req) {
         tarih: body.tarih,
         vakit: body.vakit,
         durum: body.durum,
+        not_metni: body.not_metni ?? null,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "ogrenci_id,tarih,vakit" }

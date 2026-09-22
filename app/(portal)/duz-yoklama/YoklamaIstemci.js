@@ -20,7 +20,8 @@ export default function YoklamaIstemci({ isAdmin, baslangicTurler, baslangicGrup
   const [ogrenciler, setOgrenciler] = useState([]);
   const [kayitMap, setKayitMap] = useState({}); // ogrenci_id -> {durum, saat}
   const [yukleniyor, setYukleniyor] = useState(true);
-  const [kaydedenId, setKaydedenId] = useState(null);
+  const [sebepAcikId, setSebepAcikId] = useState(null);
+  const [sebepTaslak, setSebepTaslak] = useState("");
 
   const turleriGetir = useCallback(() => {
     fetch("/api/yoklama-turleri")
@@ -53,27 +54,53 @@ export default function YoklamaIstemci({ isAdmin, baslangicTurler, baslangicGrup
   // başka bir hocanın az önce işaretlediği bir kayıt da kısa sürede görünür.
   useAraliklaTazele(() => veriGetir(true));
 
-  async function isaretle(ogrenciId, durum) {
-    setKaydedenId(ogrenciId);
-    const res = await fetch("/api/yoklama", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ogrenci_id: ogrenciId, tarih, tur_id: turId, durum }),
-    });
-    const d = await res.json();
-    if (d.kayit) setKayitMap((m) => ({ ...m, [ogrenciId]: d.kayit }));
-    setKaydedenId(null);
+  // İyimser (optimistic) güncelleme: sunucudan cevap beklemeden ekranı hemen
+  // günceller, böylece dokunuş anında tepki veriyormuş gibi hissettirir.
+  // Cevap gelince gerçek kayıtla senkronlanır; hata olursa geri alınır.
+  async function isaretle(ogrenciId, durum, notMetni) {
+    const oncekiKayit = kayitMap[ogrenciId];
+    const notDegeri = durum === "izinli" ? (notMetni ?? oncekiKayit?.not_metni ?? null) : null;
+
+    setKayitMap((m) => ({ ...m, [ogrenciId]: { ...(m[ogrenciId] || {}), durum, not_metni: notDegeri } }));
+
+    try {
+      const res = await fetch("/api/yoklama", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ogrenci_id: ogrenciId, tarih, tur_id: turId, durum, not_metni: notDegeri }),
+      });
+      const d = await res.json();
+      if (d.kayit) setKayitMap((m) => ({ ...m, [ogrenciId]: d.kayit }));
+      else throw new Error(d.error || "kayıt hatası");
+    } catch {
+      setKayitMap((m) => {
+        const yeni = { ...m };
+        if (oncekiKayit) yeni[ogrenciId] = oncekiKayit;
+        else delete yeni[ogrenciId];
+        return yeni;
+      });
+    }
   }
 
   async function isaretiSil(ogrenciId) {
-    setKaydedenId(ogrenciId);
-    await fetch(`/api/yoklama?ogrenci_id=${ogrenciId}&tarih=${tarih}&tur_id=${turId}`, { method: "DELETE" });
     setKayitMap((m) => {
       const yeni = { ...m };
       delete yeni[ogrenciId];
       return yeni;
     });
-    setKaydedenId(null);
+    if (sebepAcikId === ogrenciId) setSebepAcikId(null);
+    await fetch(`/api/yoklama?ogrenci_id=${ogrenciId}&tarih=${tarih}&tur_id=${turId}`, { method: "DELETE" });
+  }
+
+  function izinliTiklandi(ogrenciId) {
+    isaretle(ogrenciId, "izinli");
+    setSebepAcikId(ogrenciId);
+    setSebepTaslak(kayitMap[ogrenciId]?.not_metni || "");
+  }
+
+  function sebepKaydet(ogrenciId) {
+    isaretle(ogrenciId, "izinli", sebepTaslak.trim() || null);
+    setSebepAcikId(null);
   }
 
   async function yeniTurEkle(e) {
@@ -174,51 +201,70 @@ export default function YoklamaIstemci({ isAdmin, baslangicTurler, baslangicGrup
             ogrenciler.map((o) => {
               const kayit = kayitMap[o.id];
               const durum = kayit?.durum;
+              const sebepAcik = sebepAcikId === o.id;
               return (
-                <div className="ogrenci-satir" key={o.id}>
-                  <div>
-                    <div className="ogrenci-ad">{o.ad_soyad}</div>
-                    <div className="ogrenci-detay">
-                      {durum === "geldi" && kayit?.saat && <>Saat {kayit.saat.slice(0, 5)} itibarıyla geldi</>}
-                      {durum === "izinli" && <>İzinli olarak işaretlendi</>}
-                      {durum === "izinsiz" && <>İzinsiz olarak işaretlendi</>}
-                      {!durum && <>Henüz işaretlenmedi</>}
+                <div key={o.id}>
+                  <div className="ogrenci-satir" style={sebepAcik || (durum === "izinli" && kayit?.not_metni) ? { borderBottom: "none" } : undefined}>
+                    <div>
+                      <div className="ogrenci-ad">{o.ad_soyad}</div>
+                      <div className="ogrenci-detay">
+                        {durum === "geldi" && kayit?.saat && <>Saat {kayit.saat.slice(0, 5)} itibarıyla geldi</>}
+                        {durum === "izinli" && <>İzinli olarak işaretlendi</>}
+                        {durum === "izinsiz" && <>İzinsiz olarak işaretlendi</>}
+                        {!durum && <>Henüz işaretlenmedi</>}
+                      </div>
+                    </div>
+
+                    <div className="durum-btn-grup">
+                      <button className={`durum-btn ${durum === "geldi" ? "secili-geldi" : ""}`} onClick={() => isaretle(o.id, "geldi")}>
+                        Geldi
+                      </button>
+                      <button className={`durum-btn ${durum === "izinli" ? "secili-izinli" : ""}`} onClick={() => izinliTiklandi(o.id)}>
+                        İzinli
+                      </button>
+                      <button className={`durum-btn ${durum === "izinsiz" ? "secili-izinsiz" : ""}`} onClick={() => isaretle(o.id, "izinsiz")}>
+                        İzinsiz
+                      </button>
+                      {durum && (
+                        <button className="btn btn-hayalet btn-sm" title="İşareti sil" onClick={() => isaretiSil(o.id)}>
+                          Sıfırla
+                        </button>
+                      )}
                     </div>
                   </div>
 
-                  <div className="durum-btn-grup">
-                    <button
-                      className={`durum-btn ${durum === "geldi" ? "secili-geldi" : ""}`}
-                      disabled={kaydedenId === o.id}
-                      onClick={() => isaretle(o.id, "geldi")}
-                    >
-                      Geldi
-                    </button>
-                    <button
-                      className={`durum-btn ${durum === "izinli" ? "secili-izinli" : ""}`}
-                      disabled={kaydedenId === o.id}
-                      onClick={() => isaretle(o.id, "izinli")}
-                    >
-                      İzinli
-                    </button>
-                    <button
-                      className={`durum-btn ${durum === "izinsiz" ? "secili-izinsiz" : ""}`}
-                      disabled={kaydedenId === o.id}
-                      onClick={() => isaretle(o.id, "izinsiz")}
-                    >
-                      İzinsiz
-                    </button>
-                    {durum && (
+                  {sebepAcik && (
+                    <div className="sebep-alani">
+                      <input
+                        className="girdi"
+                        autoFocus
+                        placeholder="İzin sebebi (isteğe bağlı) — örn. Doktor randevusu"
+                        value={sebepTaslak}
+                        onChange={(e) => setSebepTaslak(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && sebepKaydet(o.id)}
+                      />
+                      <button className="btn btn-lacivert btn-sm" onClick={() => sebepKaydet(o.id)}>
+                        Kaydet
+                      </button>
+                      <button className="btn btn-hayalet btn-sm" onClick={() => setSebepAcikId(null)}>
+                        Kapat
+                      </button>
+                    </div>
+                  )}
+                  {!sebepAcik && durum === "izinli" && kayit?.not_metni && (
+                    <div className="sebep-alani sebep-goruntu">
+                      <span>Sebep: {kayit.not_metni}</span>
                       <button
                         className="btn btn-hayalet btn-sm"
-                        title="İşareti sil"
-                        disabled={kaydedenId === o.id}
-                        onClick={() => isaretiSil(o.id)}
+                        onClick={() => {
+                          setSebepAcikId(o.id);
+                          setSebepTaslak(kayit.not_metni || "");
+                        }}
                       >
-                        Sıfırla
+                        Düzenle
                       </button>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
