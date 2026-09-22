@@ -32,6 +32,7 @@ export default function IstatistikIstemci({ baslangicGruplar, baslangicTurler, b
   const [bitis, setBitis] = useState(bugun());
   const [sonuc, setSonuc] = useState([]);
   const [yukleniyor, setYukleniyor] = useState(true);
+  const [kisiAra, setKisiAra] = useState("");
 
   const getir = useCallback(() => {
     if (kaynak === "gorev") {
@@ -69,8 +70,12 @@ export default function IstatistikIstemci({ baslangicGruplar, baslangicTurler, b
     kaynak === "namaz"
       ? { ilk: "Kıldı", ikinci: "Geç Kıldı", ucuncu: "Kılmadı", oranEtiket: "Kılma oranı" }
       : kaynak === "gorev"
-      ? { ilk: "Yaptı", ikinci: null, ucuncu: "Yapmadı", oranEtiket: "Yapma oranı" }
+      ? { ilk: "Vazifeli olduğu gün", ikinci: null, ucuncu: null, oranEtiket: "Aralığın yüzdesi" }
       : { ilk: "Geldi", ikinci: "İzinli", ucuncu: "İzinsiz", oranEtiket: "Devam oranı" };
+
+  const gosterilenSonuc = kisiAra.trim()
+    ? sonuc.filter((s) => s.ogrenci.ad_soyad.toLocaleLowerCase("tr").includes(kisiAra.trim().toLocaleLowerCase("tr")))
+    : sonuc;
 
   return (
     <>
@@ -144,30 +149,43 @@ export default function IstatistikIstemci({ baslangicGruplar, baslangicTurler, b
         </div>
       </div>
 
+      {sonuc.length > 3 && (
+        <input
+          className="girdi"
+          style={{ marginBottom: 14, maxWidth: 280 }}
+          placeholder="Kişi ara..."
+          value={kisiAra}
+          onChange={(e) => setKisiAra(e.target.value)}
+        />
+      )}
+
       <div className="kart">
         <div className="kart-ic">
           {yukleniyor && <div className="bos-durum">Yükleniyor...</div>}
           {!yukleniyor && sonuc.length === 0 && (
             <div className="bos-durum">{kaynak === "gorev" ? "Bu listede kişi yok." : "Bu grupta öğrenci yok."}</div>
           )}
-          {!yukleniyor && sonuc.length > 0 && (
+          {!yukleniyor && sonuc.length > 0 && gosterilenSonuc.length === 0 && (
+            <div className="bos-durum">"{kisiAra}" ile eşleşen kimse yok.</div>
+          )}
+          {!yukleniyor && gosterilenSonuc.length > 0 && (
             <table>
               <thead>
                 <tr>
                   <th>{kaynak === "gorev" ? "Kişi" : "Öğrenci"}</th>
                   <th>{basliklar.ilk}</th>
                   {basliklar.ikinci && <th>{basliklar.ikinci}</th>}
-                  <th>{basliklar.ucuncu}</th>
+                  {basliklar.ucuncu && <th>{basliklar.ucuncu}</th>}
                   <th style={{ width: 160 }}>{basliklar.oranEtiket}</th>
                 </tr>
               </thead>
               <tbody>
-                {sonuc.map((s) => (
+                {gosterilenSonuc.map((s) => (
                   <tr key={s.ogrenci.id}>
                     <td style={{ fontWeight: 600 }}>{s.ogrenci.ad_soyad}</td>
                     <td>{s.geldi}</td>
                     {basliklar.ikinci && <td>{s.izinli}</td>}
-                    <td>{s.izinsiz}</td>
+                    {basliklar.ucuncu && <td>{s.izinsiz}</td>}
                     <td>
                       {s.oran === null ? (
                         <span style={{ color: "var(--metin-soluk)" }}>Kayıt yok</span>

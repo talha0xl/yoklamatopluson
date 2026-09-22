@@ -4,71 +4,81 @@ import Link from "next/link";
 import { verifySession } from "../../lib/session";
 import { MODULLER, modulErisimVarMi } from "../../lib/moduller";
 import { supabaseServer } from "../../lib/supabaseServer";
+import { sirdakiOge } from "../../lib/rotasyon";
 
 function bugun() {
   const d = new Date();
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 }
 
+async function yoklamaOzetiGetir(supabase, tarih) {
+  const { count: toplamOgrenci } = await supabase
+    .from("ogrenciler")
+    .select("id", { count: "exact", head: true })
+    .eq("aktif", true);
+  const { data: tur } = await supabase
+    .from("yoklama_turleri")
+    .select("id")
+    .eq("isim", "Günlük Yoklama")
+    .maybeSingle();
+  if (!tur || !toplamOgrenci) return null;
+  const { count: geldi } = await supabase
+    .from("yoklama")
+    .select("id", { count: "exact", head: true })
+    .eq("tarih", tarih)
+    .eq("tur_id", tur.id)
+    .eq("durum", "geldi");
+  return { geldi: geldi || 0, toplam: toplamOgrenci };
+}
+
+async function namazOzetiGetir(supabase, tarih) {
+  const { count: toplamOgrenci } = await supabase
+    .from("ogrenciler")
+    .select("id", { count: "exact", head: true })
+    .eq("aktif", true);
+  if (!toplamOgrenci) return null;
+  const { count: kildi } = await supabase
+    .from("namaz_yoklama")
+    .select("id", { count: "exact", head: true })
+    .eq("tarih", tarih)
+    .in("durum", ["kildi", "gec_kildi"]);
+  return { kildi: kildi || 0, toplamMumkun: toplamOgrenci * 5 };
+}
+
+async function tekVazifeGetir(supabase, liste, tarih) {
+  const [{ data: kisiler }, { data: gruplar }] = await Promise.all([
+    supabase.from("gorev_kisileri").select("*").eq("aktif", true).eq("liste_id", liste.id).order("sira"),
+    supabase.from("gorev_gruplari").select("*").eq("liste_id", liste.id).order("siralama"),
+  ]);
+  const birimler =
+    gruplar && gruplar.length
+      ? gruplar.map((g) => ({ isim: g.isim }))
+      : (kisiler || []).map((k) => ({ isim: k.ad_soyad }));
+  if (!birimler.length) return null;
+  const bugunVazifeli = sirdakiOge(birimler, liste.rotasyon_baslangic, tarih);
+  return bugunVazifeli ? { liste: liste.isim, kisi: bugunVazifeli.isim } : null;
+}
+
+async function vazifelerGetir(supabase, tarih) {
+  const { data: listeler } = await supabase.from("gorev_listeleri").select("*").eq("rotasyonlu", true).order("siralama");
+  const sonuclar = await Promise.all((listeler || []).map((liste) => tekVazifeGetir(supabase, liste, tarih)));
+  return sonuclar.filter(Boolean);
+}
+
 async function ozetVerileriGetir(session) {
   const supabase = supabaseServer();
   const tarih = bugun();
-  const ozet = { yoklama: null, namaz: null, gorev: null };
+  const ozet = { yoklama: null, namaz: null, vazifeler: [] };
 
-  try {
-    if (modulErisimVarMi(session, "duz_yoklama")) {
-      const { count: toplamOgrenci } = await supabase
-        .from("ogrenciler")
-        .select("id", { count: "exact", head: true })
-        .eq("aktif", true);
-      const { data: tur } = await supabase
-        .from("yoklama_turleri")
-        .select("id")
-        .eq("isim", "Günlük Yoklama")
-        .maybeSingle();
-      if (tur && toplamOgrenci) {
-        const { count: geldi } = await supabase
-          .from("yoklama")
-          .select("id", { count: "exact", head: true })
-          .eq("tarih", tarih)
-          .eq("tur_id", tur.id)
-          .eq("durum", "geldi");
-        ozet.yoklama = { geldi: geldi || 0, toplam: toplamOgrenci };
-      }
-    }
-  } catch {}
+  const [yoklamaSonuc, namazSonuc, vazifeSonuc] = await Promise.all([
+    modulErisimVarMi(session, "duz_yoklama") ? yoklamaOzetiGetir(supabase, tarih).catch(() => null) : Promise.resolve(null),
+    modulErisimVarMi(session, "namaz_yoklama") ? namazOzetiGetir(supabase, tarih).catch(() => null) : Promise.resolve(null),
+    modulErisimVarMi(session, "gorev_listeleri") ? vazifelerGetir(supabase, tarih).catch(() => []) : Promise.resolve([]),
+  ]);
 
-  try {
-    if (modulErisimVarMi(session, "namaz_yoklama")) {
-      const { count: toplamOgrenci } = await supabase
-        .from("ogrenciler")
-        .select("id", { count: "exact", head: true })
-        .eq("aktif", true);
-      if (toplamOgrenci) {
-        const { count: kildi } = await supabase
-          .from("namaz_yoklama")
-          .select("id", { count: "exact", head: true })
-          .eq("tarih", tarih)
-          .in("durum", ["kildi", "gec_kildi"]);
-        ozet.namaz = { kildi: kildi || 0, toplamMumkun: toplamOgrenci * 5 };
-      }
-    }
-  } catch {}
-
-  try {
-    if (modulErisimVarMi(session, "gorev_listeleri")) {
-      const { count: toplamKisi } = await supabase
-        .from("gorev_kisileri")
-        .select("id", { count: "exact", head: true })
-        .eq("aktif", true);
-      const { count: yapildi } = await supabase
-        .from("gorev_kayitlari")
-        .select("id", { count: "exact", head: true })
-        .eq("tarih", tarih)
-        .eq("yapildi", true);
-      if (toplamKisi) ozet.gorev = { yapildi: yapildi || 0, toplam: toplamKisi };
-    }
-  } catch {}
+  ozet.yoklama = yoklamaSonuc;
+  ozet.namaz = namazSonuc;
+  ozet.vazifeler = vazifeSonuc || [];
 
   return ozet;
 }
@@ -82,7 +92,6 @@ export default async function Anasayfa() {
     (m) => (m.hazir || session.admin) && modulErisimVarMi(session, m.anahtar)
   );
   const ozet = await ozetVerileriGetir(session);
-  const ozetVarMi = ozet.yoklama || ozet.namaz || ozet.gorev;
 
   return (
     <>
@@ -90,6 +99,20 @@ export default async function Anasayfa() {
         <h1>Hoş geldiniz{session.sahip_adi ? `, ${session.sahip_adi}` : ""}</h1>
       </div>
       <p className="sayfa-alt">Devam etmek istediğiniz modülü seçin.</p>
+
+      {ozet.vazifeler.length > 0 && (
+        <>
+          <div className="ozet-baslik">Bugünün vazifeleri</div>
+          <div className="vazife-ozet-izgara">
+            {ozet.vazifeler.map((v) => (
+              <div className="vazife-ozet-kart" key={v.liste}>
+                <div className="vazife-ozet-liste">{v.liste}</div>
+                <div className="vazife-ozet-kisi">{v.kisi}</div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
       <div className="modul-izgara">
         {gorulebilirModuller.map((m) => {
@@ -105,9 +128,9 @@ export default async function Anasayfa() {
         )}
       </div>
 
-      {ozetVarMi && (
+      {(ozet.yoklama || ozet.namaz) && (
         <>
-          <div className="ozet-baslik">Bugünün özeti</div>
+          <div className="ozet-baslik" style={{ marginTop: 22 }}>Bugünün özeti</div>
           <div className="ozet-izgara">
             {ozet.yoklama && (
               <OzetKart
@@ -121,13 +144,6 @@ export default async function Anasayfa() {
                 deger={`%${ozet.namaz.toplamMumkun ? Math.round((ozet.namaz.kildi / ozet.namaz.toplamMumkun) * 100) : 0}`}
                 etiket="Bugün namaz tamamlanma oranı"
                 oran={ozet.namaz.toplamMumkun ? Math.round((ozet.namaz.kildi / ozet.namaz.toplamMumkun) * 100) : 0}
-              />
-            )}
-            {ozet.gorev && (
-              <OzetKart
-                deger={`${ozet.gorev.yapildi} / ${ozet.gorev.toplam}`}
-                etiket="Bugün görev listelerinde tamamlanan"
-                oran={ozet.gorev.toplam ? Math.round((ozet.gorev.yapildi / ozet.gorev.toplam) * 100) : 0}
               />
             )}
           </div>

@@ -267,3 +267,21 @@ tr:last-child td { border-bottom: none; }
   border-left: 3px solid var(--lacivert);
 }
 tr.sirdaki-satir td:first-child { padding-left: 11px; }
+
+/* Görev Listeleri: bugünün vazifesi kartları */
+.vazife-kart { display: flex; flex-direction: column; }
+.yaklasan-rozet {
+  background: rgba(40, 51, 74, 0.05);
+  border-radius: 8px;
+  padding: 6px 9px;
+  min-width: 58px;
+  text-align: center;
+}
+.yaklasan-gun { font-size: 10.5px; color: var(--metin-soluk); font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; }
+.yaklasan-isim { font-size: 12px; font-weight: 700; color: var(--lacivert); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90px; }
+
+/* Ana sayfa: bugünün vazifeleri özeti */
+.vazife-ozet-izgara { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+.vazife-ozet-kart { background: #fff; border: 1px solid var(--kenar); border-radius: 10px; padding: 14px 16px; }
+.vazife-ozet-liste { font-size: 12px; color: var(--metin-soluk); font-weight: 600; margin-bottom: 4px; }
+.vazife-ozet-kisi { font-size: 16px; font-weight: 800; color: var(--lacivert); }

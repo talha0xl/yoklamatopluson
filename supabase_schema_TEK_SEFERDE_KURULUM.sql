@@ -177,7 +177,7 @@ alter table gorev_kisileri enable row level security;
 alter table gorev_kayitlari enable row level security;
 
 insert into gorev_listeleri (isim, siralama, vakit_bazli, rotasyonlu) values
-  ('Yemekçilik', 1, true, false),
+  ('Yemekçilik', 1, true, true),
   ('Müezzinlik', 2, true, true),
   ('Nöbetçi', 3, false, true),
   ('Çaycı', 4, false, true)

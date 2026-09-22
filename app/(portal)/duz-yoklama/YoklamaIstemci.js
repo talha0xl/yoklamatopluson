@@ -18,7 +18,6 @@ export default function YoklamaIstemci({ isAdmin, baslangicTurler, baslangicGrup
   const [tarih, setTarih] = useState(bugun());
   const [ogrenciler, setOgrenciler] = useState([]);
   const [kayitMap, setKayitMap] = useState({}); // ogrenci_id -> {durum, saat}
-  const [acikGelmedi, setAcikGelmedi] = useState({}); // ogrenci_id -> bool
   const [yukleniyor, setYukleniyor] = useState(true);
   const [kaydedenId, setKaydedenId] = useState(null);
 
@@ -41,7 +40,6 @@ export default function YoklamaIstemci({ isAdmin, baslangicTurler, baslangicGrup
         const map = {};
         (d.kayitlar || []).forEach((k) => (map[k.ogrenci_id] = k));
         setKayitMap(map);
-        setAcikGelmedi({});
         setYukleniyor(false);
       });
   }, [grupId, tarih, turId]);
@@ -56,10 +54,7 @@ export default function YoklamaIstemci({ isAdmin, baslangicTurler, baslangicGrup
       body: JSON.stringify({ ogrenci_id: ogrenciId, tarih, tur_id: turId, durum }),
     });
     const d = await res.json();
-    if (d.kayit) {
-      setKayitMap((m) => ({ ...m, [ogrenciId]: d.kayit }));
-      setAcikGelmedi((a) => ({ ...a, [ogrenciId]: false }));
-    }
+    if (d.kayit) setKayitMap((m) => ({ ...m, [ogrenciId]: d.kayit }));
     setKaydedenId(null);
   }
 
@@ -71,7 +66,6 @@ export default function YoklamaIstemci({ isAdmin, baslangicTurler, baslangicGrup
       delete yeni[ogrenciId];
       return yeni;
     });
-    setAcikGelmedi((a) => ({ ...a, [ogrenciId]: false }));
     setKaydedenId(null);
   }
 
@@ -173,7 +167,6 @@ export default function YoklamaIstemci({ isAdmin, baslangicTurler, baslangicGrup
             ogrenciler.map((o) => {
               const kayit = kayitMap[o.id];
               const durum = kayit?.durum;
-              const gelmediAcik = acikGelmedi[o.id];
               return (
                 <div className="ogrenci-satir" key={o.id}>
                   <div>
@@ -186,47 +179,39 @@ export default function YoklamaIstemci({ isAdmin, baslangicTurler, baslangicGrup
                     </div>
                   </div>
 
-                  {!gelmediAcik && (
-                    <div className="durum-btn-grup">
+                  <div className="durum-btn-grup">
+                    <button
+                      className={`durum-btn ${durum === "geldi" ? "secili-geldi" : ""}`}
+                      disabled={kaydedenId === o.id}
+                      onClick={() => isaretle(o.id, "geldi")}
+                    >
+                      Geldi
+                    </button>
+                    <button
+                      className={`durum-btn ${durum === "izinli" ? "secili-izinli" : ""}`}
+                      disabled={kaydedenId === o.id}
+                      onClick={() => isaretle(o.id, "izinli")}
+                    >
+                      İzinli
+                    </button>
+                    <button
+                      className={`durum-btn ${durum === "izinsiz" ? "secili-izinsiz" : ""}`}
+                      disabled={kaydedenId === o.id}
+                      onClick={() => isaretle(o.id, "izinsiz")}
+                    >
+                      İzinsiz
+                    </button>
+                    {durum && (
                       <button
-                        className={`durum-btn ${durum === "geldi" ? "secili-geldi" : ""}`}
+                        className="btn btn-hayalet btn-sm"
+                        title="İşareti sil"
                         disabled={kaydedenId === o.id}
-                        onClick={() => isaretle(o.id, "geldi")}
+                        onClick={() => isaretiSil(o.id)}
                       >
-                        Geldi
+                        Sıfırla
                       </button>
-                      <button
-                        className={`durum-btn ${durum === "izinli" || durum === "izinsiz" ? (durum === "izinli" ? "secili-izinli" : "secili-izinsiz") : ""}`}
-                        disabled={kaydedenId === o.id}
-                        onClick={() => setAcikGelmedi((a) => ({ ...a, [o.id]: true }))}
-                      >
-                        {durum === "izinli" ? "İzinli" : durum === "izinsiz" ? "İzinsiz" : "Gelmedi"}
-                      </button>
-                      {durum && (
-                        <button
-                          className="btn btn-hayalet btn-sm"
-                          title="İşareti sil"
-                          disabled={kaydedenId === o.id}
-                          onClick={() => isaretiSil(o.id)}
-                        >
-                          Sıfırla
-                        </button>
-                      )}
-                    </div>
-                  )}
-                  {gelmediAcik && (
-                    <div className="durum-btn-grup">
-                      <button className="durum-btn secili-izinli" disabled={kaydedenId === o.id} onClick={() => isaretle(o.id, "izinli")}>
-                        İzinli
-                      </button>
-                      <button className="durum-btn secili-izinsiz" disabled={kaydedenId === o.id} onClick={() => isaretle(o.id, "izinsiz")}>
-                        İzinsiz
-                      </button>
-                      <button className="btn btn-hayalet btn-sm" onClick={() => setAcikGelmedi((a) => ({ ...a, [o.id]: false }))}>
-                        Vazgeç
-                      </button>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               );
             })}

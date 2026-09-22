@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseServer } from "../../../lib/supabaseServer";
+import { sirdakiOge, tarihEkle } from "../../../lib/rotasyon";
 
 // GET /api/istatistik?kaynak=yoklama&grup_id=...&tur_id=...&baslangic=...&bitis=...
 // GET /api/istatistik?kaynak=namaz&grup_id=...&baslangic=...&bitis=...
@@ -12,38 +13,51 @@ export async function GET(req) {
   const supabase = supabaseServer();
 
   if (kaynak === "gorev") {
+    // Görev Listeleri artık günlük işaretleme değil, otomatik sıra (rotasyon)
+    // ile çalışıyor. Burada "kim kaç gün vazifeliydi" sorusunu, geçmişe dönük
+    // olarak, aynı sıralama formülünü tarih tarih tekrar hesaplayarak
+    // cevaplıyoruz — ayrıca kayıt tutmaya gerek yok.
     const listeId = req.nextUrl.searchParams.get("liste_id");
-    const { data: kisiler, error: ek1 } = await supabase
-      .from("gorev_kisileri")
-      .select("*")
-      .eq("aktif", true)
-      .eq("liste_id", listeId)
-      .order("sira");
-    if (ek1) return NextResponse.json({ error: ek1.message }, { status: 500 });
-    const kisiIds = (kisiler || []).map((k) => k.id);
+    const { data: liste, error: elis } = await supabase.from("gorev_listeleri").select("*").eq("id", listeId).maybeSingle();
+    if (elis) return NextResponse.json({ error: elis.message }, { status: 500 });
 
-    let kayitlar = [];
-    if (kisiIds.length) {
-      let q = supabase.from("gorev_kayitlari").select("*").in("kisi_id", kisiIds);
-      if (baslangic) q = q.gte("tarih", baslangic);
-      if (bitis) q = q.lte("tarih", bitis);
-      const { data, error: ek2 } = await q;
-      if (ek2) return NextResponse.json({ error: ek2.message }, { status: 500 });
-      kayitlar = data;
+    const [{ data: kisiler, error: ek1 }, { data: gruplar, error: eg1 }] = await Promise.all([
+      supabase.from("gorev_kisileri").select("*").eq("aktif", true).eq("liste_id", listeId).order("sira"),
+      supabase.from("gorev_gruplari").select("*").eq("liste_id", listeId).order("siralama"),
+    ]);
+    if (ek1) return NextResponse.json({ error: ek1.message }, { status: 500 });
+    if (eg1) return NextResponse.json({ error: eg1.message }, { status: 500 });
+
+    const kisiSayaclari = {};
+    (kisiler || []).forEach((k) => (kisiSayaclari[k.id] = 0));
+    let toplamGun = 0;
+
+    if (liste?.rotasyonlu && (kisiler || []).length && baslangic && bitis) {
+      const birimler =
+        gruplar && gruplar.length
+          ? gruplar.map((g) => ({ id: g.id, uyeler: (kisiler || []).filter((k) => k.grup_id === g.id) }))
+          : (kisiler || []).map((k) => ({ id: k.id, uyeler: [k] }));
+
+      let gun = baslangic;
+      let donguSayaci = 0;
+      while (gun <= bitis && donguSayaci < 400) {
+        const birim = sirdakiOge(birimler, liste.rotasyon_baslangic, gun);
+        if (birim) birim.uyeler.forEach((k) => (kisiSayaclari[k.id] = (kisiSayaclari[k.id] || 0) + 1));
+        toplamGun++;
+        gun = tarihEkle(gun, 1);
+        donguSayaci++;
+      }
     }
 
     const sonuc = (kisiler || []).map((k) => {
-      const kK = kayitlar.filter((r) => r.kisi_id === k.id);
-      const yapti = kK.filter((r) => r.yapildi).length;
-      const yapmadi = kK.filter((r) => !r.yapildi).length;
-      const toplam = kK.length;
+      const gunSayisi = kisiSayaclari[k.id] || 0;
       return {
         ogrenci: k, // ortak arayüz için aynı alan adı kullanılıyor
-        geldi: yapti,
+        geldi: gunSayisi,
         izinli: 0,
-        izinsiz: yapmadi,
-        toplam,
-        oran: toplam ? Math.round((yapti / toplam) * 100) : null,
+        izinsiz: 0,
+        toplam: toplamGun,
+        oran: toplamGun ? Math.round((gunSayisi / toplamGun) * 100) : null,
       };
     });
     return NextResponse.json({ sonuc });
