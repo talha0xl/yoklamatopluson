@@ -221,6 +221,18 @@ alter table gorev_kategorileri enable row level security;
 alter table gorev_kisileri enable row level security;
 alter table gorev_kayitlari enable row level security;
 
+create table if not exists denetim_kayitlari (
+  id uuid primary key default gen_random_uuid(),
+  tarih timestamptz not null default now(),
+  kullanici text,
+  islem text not null,
+  hedef_tablo text not null,
+  hedef_id text,
+  aciklama text not null
+);
+create index if not exists denetim_kayitlari_tarih_idx on denetim_kayitlari (tarih desc);
+alter table denetim_kayitlari enable row level security;
+
 insert into gorev_listeleri (isim, siralama, vakit_bazli, rotasyonlu) values
   ('Yemekçilik', 1, true, true),
   ('Müezzinlik', 2, true, true),

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseServer } from "../../../lib/supabaseServer";
+import { denetimKaydet } from "../../../lib/denetim";
 
 export async function GET(req) {
   const grupId = req.nextUrl.searchParams.get("grup_id");
@@ -41,6 +42,8 @@ export async function POST(req) {
     );
     if (e2) return NextResponse.json({ error: `Öğrenci eklendi ama yakınlar kaydedilemedi: ${e2.message}` }, { status: 500 });
   }
+
+  await denetimKaydet(supabase, { islem: "ekleme", hedefTablo: "ogrenciler", hedefId: ogrenci.id, aciklama: `${ogrenci.ad_soyad} eklendi` });
 
   return NextResponse.json({ ogrenci });
 }

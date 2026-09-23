@@ -40,6 +40,12 @@ export async function middleware(req) {
     url.pathname = "/";
     return NextResponse.redirect(url);
   }
+  // Sunum Modu, İstatistik ile aynı özet veriyi gösteriyor — aynı erişim kuralı.
+  if (pathname.startsWith("/sunum") && !istatistikErisimVarMi(session)) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/";
+    return NextResponse.redirect(url);
+  }
   if (pathname.startsWith("/mesaj") && !mesajErisimVarMi(session)) {
     const url = req.nextUrl.clone();
     url.pathname = "/";

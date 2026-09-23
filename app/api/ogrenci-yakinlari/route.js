@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseServer } from "../../../lib/supabaseServer";
+import { denetimKaydet } from "../../../lib/denetim";
 
 // GET /api/ogrenci-yakinlari?ogrenci_id=...
 export async function GET(req) {
@@ -36,5 +37,14 @@ export async function POST(req) {
     .select()
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  const { data: ogrenci } = await supabase.from("ogrenciler").select("ad_soyad").eq("id", body.ogrenci_id).maybeSingle();
+  await denetimKaydet(supabase, {
+    islem: "ekleme",
+    hedefTablo: "ogrenci_yakinlari",
+    hedefId: data.id,
+    aciklama: `${ogrenci?.ad_soyad || "?"} için ${data.yakinlik} eklendi${data.ad_soyad ? ` (${data.ad_soyad})` : ""}`,
+  });
+
   return NextResponse.json({ yakin: data });
 }

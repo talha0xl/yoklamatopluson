@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Fragment } from "react";
 
 function bugun() {
   const d = new Date();
@@ -15,6 +15,14 @@ const KAYNAKLAR = [
   { anahtar: "namaz", isim: "Namaz Yoklama" },
   { anahtar: "gorev", isim: "Görev Listeleri" },
 ];
+
+const VAKIT_ETIKET = { sabah: "Sabah", ogle: "Öğle", ikindi: "İkindi", aksam: "Akşam", yatsi: "Yatsı" };
+
+function tarihFormatla(t) {
+  if (!t) return "";
+  const [yil, ay, gun] = t.split("-");
+  return `${gun}.${ay}.${yil}`;
+}
 
 export default function IstatistikIstemci({ baslangicGruplar, baslangicTurler, baslangicListeler }) {
   const [kaynak, setKaynak] = useState("yoklama");
@@ -34,6 +42,9 @@ export default function IstatistikIstemci({ baslangicGruplar, baslangicTurler, b
   const [yukleniyor, setYukleniyor] = useState(true);
   const [kisiAra, setKisiAra] = useState("");
   const [karneIndiriliyor, setKarneIndiriliyor] = useState(false);
+  const [acikOgrenciId, setAcikOgrenciId] = useState(null);
+  const [mektupIndiriliyor, setMektupIndiriliyor] = useState(false);
+  const [mektupHata, setMektupHata] = useState("");
 
   const getir = useCallback(() => {
     if (kaynak === "gorev") {
@@ -62,6 +73,7 @@ export default function IstatistikIstemci({ baslangicGruplar, baslangicTurler, b
   }, [kaynak, grupId, turId, listeId, baslangic, bitis]);
 
   useEffect(() => getir(), [getir]);
+  useEffect(() => setAcikOgrenciId(null), [kaynak, grupId, turId, listeId]);
 
   const genelPayda = sonuc.reduce((a, s) => a + (s.payda ?? s.toplam), 0);
   const genelBasari = sonuc.reduce((a, s) => a + (s.basari ?? s.geldi), 0);
@@ -138,6 +150,35 @@ export default function IstatistikIstemci({ baslangicGruplar, baslangicTurler, b
       URL.revokeObjectURL(url);
     } finally {
       setKarneIndiriliyor(false);
+    }
+  }
+
+  async function veliMektubuIndir() {
+    setMektupHata("");
+    setMektupIndiriliyor(true);
+    try {
+      const params = new URLSearchParams({ kaynak, baslangic, bitis });
+      if (grupId) params.set("grup_id", grupId);
+      if (kaynak === "yoklama" && turId) params.set("tur_id", turId);
+      const res = await fetch(`/api/istatistik/pdf?${params.toString()}`);
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || "Mektup oluşturulamadı.");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const baslikMetni = gruplar.find((g) => g.id === grupId)?.isim || "Tum-Ogrenciler";
+      a.href = url;
+      a.download = `veli-mektubu-${baslikMetni}-${baslangic}-${bitis}.pdf`.replace(/\s+/g, "-");
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setMektupHata(err.message);
+    } finally {
+      setMektupIndiriliyor(false);
     }
   }
 
@@ -228,7 +269,13 @@ export default function IstatistikIstemci({ baslangicGruplar, baslangicTurler, b
             {karneIndiriliyor ? "Hazırlanıyor..." : "📊 Karneyi Excel indir"}
           </button>
         )}
+        {kaynak !== "gorev" && gosterilenSonuc.length > 0 && (
+          <button className="btn btn-hayalet" onClick={veliMektubuIndir} disabled={mektupIndiriliyor}>
+            {mektupIndiriliyor ? "Hazırlanıyor..." : "📄 Veli Mektubu (PDF)"}
+          </button>
+        )}
       </div>
+      {mektupHata && <div className="hata" style={{ marginBottom: 14 }}>{mektupHata}</div>}
 
       <div className="kart">
         <div className="kart-ic">
@@ -251,26 +298,64 @@ export default function IstatistikIstemci({ baslangicGruplar, baslangicTurler, b
                 </tr>
               </thead>
               <tbody>
-                {gosterilenSonuc.map((s) => (
-                  <tr key={s.ogrenci.id}>
-                    <td style={{ fontWeight: 600 }}>{s.ogrenci.ad_soyad}</td>
-                    {basliklar.sutunlar.map((su) => (
-                      <td key={su.alan}>{s[su.alan]}</td>
-                    ))}
-                    <td>
-                      {s.oran === null ? (
-                        <span style={{ color: "var(--metin-soluk)" }}>Kayıt yok</span>
-                      ) : (
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <div className="istatistik-cubuk-sarma" style={{ flex: 1 }}>
-                            <div className="istatistik-cubuk" style={{ width: `${s.oran}%` }} />
-                          </div>
-                          <span style={{ fontSize: 13, fontWeight: 700, width: 34 }}>%{s.oran}</span>
-                        </div>
+                {gosterilenSonuc.map((s) => {
+                  const tiklanabilir = kaynak !== "gorev";
+                  const acik = acikOgrenciId === s.ogrenci.id;
+                  return (
+                    <Fragment key={s.ogrenci.id}>
+                      <tr
+                        style={tiklanabilir ? { cursor: "pointer" } : undefined}
+                        onClick={() => tiklanabilir && setAcikOgrenciId(acik ? null : s.ogrenci.id)}
+                        title={tiklanabilir ? "İzinli tarih ve sebeplerini görmek için tıklayın" : undefined}
+                      >
+                        <td style={{ fontWeight: 600 }}>
+                          {s.ogrenci.ad_soyad}
+                          {tiklanabilir && s.izinKayitlari?.length > 0 && (
+                            <span className="rozet rozet-gri" style={{ marginLeft: 8, fontWeight: 600 }}>
+                              {s.izinKayitlari.length} izin
+                            </span>
+                          )}
+                        </td>
+                        {basliklar.sutunlar.map((su) => (
+                          <td key={su.alan}>{s[su.alan]}</td>
+                        ))}
+                        <td>
+                          {s.oran === null ? (
+                            <span style={{ color: "var(--metin-soluk)" }}>Kayıt yok</span>
+                          ) : (
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <div className="istatistik-cubuk-sarma" style={{ flex: 1 }}>
+                                <div className="istatistik-cubuk" style={{ width: `${s.oran}%` }} />
+                              </div>
+                              <span style={{ fontSize: 13, fontWeight: 700, width: 34 }}>%{s.oran}</span>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                      {acik && (
+                        <tr>
+                          <td colSpan={2 + basliklar.sutunlar.length} style={{ background: "var(--gri-acik)" }}>
+                            {s.izinKayitlari?.length > 0 ? (
+                              <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "6px 4px" }}>
+                                {s.izinKayitlari.map((iz, i) => (
+                                  <div key={i} style={{ fontSize: 13.5, display: "flex", gap: 10, flexWrap: "wrap" }}>
+                                    <strong style={{ minWidth: 90 }}>{tarihFormatla(iz.tarih)}</strong>
+                                    {iz.vakit && <span style={{ color: "var(--metin-soluk)" }}>{VAKIT_ETIKET[iz.vakit] || iz.vakit}</span>}
+                                    <span>{iz.sebep ? iz.sebep : <span style={{ color: "var(--metin-soluk)" }}>Sebep belirtilmemiş</span>}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div style={{ fontSize: 13.5, color: "var(--metin-soluk)", padding: "6px 4px" }}>
+                                Bu tarih aralığında izinli kaydı yok.
+                              </div>
+                            )}
+                          </td>
+                        </tr>
                       )}
-                    </td>
-                  </tr>
-                ))}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           )}

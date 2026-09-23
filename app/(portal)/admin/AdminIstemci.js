@@ -7,6 +7,7 @@ const SEKMELER = [
   { id: "kodlar", etiket: "Erişim Kodları" },
   { id: "gruplar", etiket: "Gruplar" },
   { id: "yedekle", etiket: "Yedekle" },
+  { id: "denetim", etiket: "Denetim Kaydı" },
 ];
 
 export default function AdminIstemci() {
@@ -28,6 +29,7 @@ export default function AdminIstemci() {
       {sekme === "kodlar" && <KodlarPaneli />}
       {sekme === "gruplar" && <GruplarPaneli />}
       {sekme === "yedekle" && <YedeklePaneli />}
+      {sekme === "denetim" && <DenetimPaneli />}
     </>
   );
 }
@@ -672,6 +674,17 @@ function GruplarPaneli() {
     getir();
   }
 
+  async function grupSil(g) {
+    if (!confirm(`"${g.isim}" grubunu kalıcı olarak silmek istediğinize emin misiniz?`)) return;
+    const res = await fetch(`/api/gruplar/${g.id}`, { method: "DELETE" });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      alert(d.error || "Grup silinemedi.");
+      return;
+    }
+    getir();
+  }
+
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 320px", gap: 20 }}>
       <div className="kart">
@@ -688,9 +701,14 @@ function GruplarPaneli() {
                       : "Veli Bilgilendirme sayfasında gizli — bu gruba mesaj gönderilmez"}
                   </div>
                 </div>
-                <button className={`btn btn-sm ${g.veli_bilgilendirme_aktif ? "btn-tehlike" : "btn-yesil"}`} onClick={() => bilgilendirmeyiDegistir(g)}>
-                  {g.veli_bilgilendirme_aktif ? "Mesajı kapat" : "Mesajı aç"}
-                </button>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button className={`btn btn-sm ${g.veli_bilgilendirme_aktif ? "btn-tehlike" : "btn-yesil"}`} onClick={() => bilgilendirmeyiDegistir(g)}>
+                    {g.veli_bilgilendirme_aktif ? "Mesajı kapat" : "Mesajı aç"}
+                  </button>
+                  <button className="btn btn-tehlike btn-sm" onClick={() => grupSil(g)}>
+                    Kaldır
+                  </button>
+                </div>
               </div>
             ))}
         </div>
@@ -715,6 +733,35 @@ function GruplarPaneli() {
 }
 
 function YedeklePaneli() {
+  const [dosya, setDosya] = useState(null);
+  const [geriYukleniyor, setGeriYukleniyor] = useState(false);
+  const [sonuc, setSonuc] = useState(null);
+  const [hata, setHata] = useState("");
+
+  async function geriYukle() {
+    if (!dosya) return;
+    if (!confirm("Seçtiğiniz yedek dosyasındaki kayıtlar sisteme geri yüklenecek (aynı kayıt varsa üzerine yazılır, yoksa eklenir). Yedekten sonra eklenen hiçbir kayıt silinmez. Devam edilsin mi?")) return;
+    setHata("");
+    setSonuc(null);
+    setGeriYukleniyor(true);
+    try {
+      const metin = await dosya.text();
+      const dokum = JSON.parse(metin);
+      const res = await fetch("/api/yedek/geri-yukle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(dokum),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Geri yükleme başarısız oldu.");
+      setSonuc(d);
+    } catch (err) {
+      setHata(err.message === "Unexpected token" || err.name === "SyntaxError" ? "Bu dosya geçerli bir yedek (.json) dosyası değil." : err.message);
+    } finally {
+      setGeriYukleniyor(false);
+    }
+  }
+
   return (
     <div style={{ maxWidth: 620 }}>
       <div className="kart" style={{ marginBottom: 20 }}>
@@ -730,13 +777,134 @@ function YedeklePaneli() {
           </a>
         </div>
       </div>
+
+      <div className="kart" style={{ marginBottom: 20 }}>
+        <div className="kart-ic">
+          <h3 style={{ fontSize: 16, marginBottom: 10 }}>Yedekten geri yükle</h3>
+          <p style={{ fontSize: 13.5, color: "var(--metin-soluk)", marginBottom: 16 }}>
+            Daha önce indirdiğiniz bir yedek dosyasını seçin — sistemdeki kayıtları o dosyadaki hâline döndürür.
+            Sadece dosyadaki kayıtları ekler/üzerine yazar; sonradan eklediğiniz hiçbir şeyi silmez.
+          </p>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+            <input
+              type="file"
+              accept="application/json,.json"
+              className="girdi"
+              style={{ maxWidth: 300 }}
+              onChange={(e) => { setDosya(e.target.files?.[0] || null); setSonuc(null); setHata(""); }}
+            />
+            <button className="btn btn-lacivert" onClick={geriYukle} disabled={!dosya || geriYukleniyor}>
+              {geriYukleniyor ? "Geri yükleniyor..." : "Geri yükle"}
+            </button>
+          </div>
+          {hata && <div className="hata" style={{ marginTop: 12 }}>{hata}</div>}
+          {sonuc && (
+            <div className="uyari" style={{ marginTop: 12 }}>
+              Geri yükleme tamamlandı — toplam {sonuc.toplamSatir} kayıt işlendi. Sayfayı yenileyip kontrol edebilirsiniz.
+            </div>
+          )}
+        </div>
+      </div>
+
       <div className="uyari">
-        Bu indirilen dosya, verinin elinizdeki bir kopyası — sistemden bir şey yanlışlıkla silinirse, bu dosyaya
-        bakıp elle geri girebilirsiniz (otomatik geri yükleme yapmaz). Asıl güvence Supabase'in kendi otomatik
-        yedeklemesi: Supabase panelinizde Project Settings → Database → Backups bölümünden hangi plandaysanız ona
-        göre günlük yedek alınıp alınmadığını görebilirsiniz — ücretsiz planda bu özellik sınırlıdır, düzenli
-        otomatik yedek için ücretli plana geçmek gerekebilir. Emin değilseniz Supabase panelinizin ekran
-        görüntüsünü atın, birlikte bakalım.
+        Ekstra güvence için Supabase'in kendi otomatik yedeklemesini de kontrol edin: Supabase panelinizde
+        Project Settings → Database → Backups bölümünden hangi plandaysanız ona göre günlük yedek alınıp
+        alınmadığını görebilirsiniz — ücretsiz planda bu özellik sınırlıdır. Emin değilseniz o ekranın görüntüsünü
+        atın, birlikte bakalım.
+      </div>
+    </div>
+  );
+}
+
+/* ================= DENETİM KAYDI ================= */
+
+const DENETIM_ROZET = {
+  ekleme: "rozet-yesil",
+  guncelleme: "rozet-mavi",
+  silme: "rozet-kirmizi",
+};
+const DENETIM_ETIKET = {
+  ekleme: "Ekleme",
+  guncelleme: "Güncelleme",
+  silme: "Silme",
+};
+
+function denetimTarihFormatla(t) {
+  if (!t) return "";
+  const d = new Date(t);
+  const gun = String(d.getDate()).padStart(2, "0");
+  const ay = String(d.getMonth() + 1).padStart(2, "0");
+  const saat = String(d.getHours()).padStart(2, "0");
+  const dakika = String(d.getMinutes()).padStart(2, "0");
+  return `${gun}.${ay}.${d.getFullYear()} ${saat}:${dakika}`;
+}
+
+function DenetimPaneli() {
+  const [kayitlar, setKayitlar] = useState([]);
+  const [yukleniyor, setYukleniyor] = useState(true);
+  const [hazirDegil, setHazirDegil] = useState(false);
+  const [ara, setAra] = useState("");
+
+  useEffect(() => {
+    fetch("/api/denetim")
+      .then((r) => r.json())
+      .then((d) => {
+        setKayitlar(d.kayitlar || []);
+        setHazirDegil(!!d.hazirDegil);
+        setYukleniyor(false);
+      });
+  }, []);
+
+  const gosterilenler = ara.trim()
+    ? kayitlar.filter((k) => (k.aciklama || "").toLocaleLowerCase("tr").includes(ara.trim().toLocaleLowerCase("tr")) || (k.kullanici || "").toLocaleLowerCase("tr").includes(ara.trim().toLocaleLowerCase("tr")))
+    : kayitlar;
+
+  return (
+    <div className="kart">
+      <div className="kart-ic">
+        {hazirDegil && (
+          <div className="uyari" style={{ marginBottom: 16 }}>
+            Denetim kaydı tablosu henüz oluşturulmamış. Supabase SQL Editor'de{" "}
+            <code>supabase_schema_v11_denetim_ve_ekler.sql</code> dosyasını çalıştırınca, o andan itibaren yapılan
+            değişiklikler burada listelenmeye başlayacak.
+          </div>
+        )}
+        {!hazirDegil && (
+          <>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
+              <div style={{ fontSize: 13, color: "var(--metin-soluk)", fontWeight: 600 }}>
+                Son {kayitlar.length} kayıt — en yeni en üstte
+              </div>
+              <input className="girdi" style={{ maxWidth: 260 }} placeholder="Kişi veya açıklamada ara..." value={ara} onChange={(e) => setAra(e.target.value)} />
+            </div>
+            {yukleniyor && <div className="bos-durum">Yükleniyor...</div>}
+            {!yukleniyor && gosterilenler.length === 0 && <div className="bos-durum">Henüz bir kayıt yok.</div>}
+            {!yukleniyor && gosterilenler.length > 0 && (
+              <table>
+                <thead>
+                  <tr>
+                    <th style={{ width: 150 }}>Tarih</th>
+                    <th style={{ width: 130 }}>Kullanıcı</th>
+                    <th style={{ width: 100 }}>İşlem</th>
+                    <th>Açıklama</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {gosterilenler.map((k) => (
+                    <tr key={k.id}>
+                      <td style={{ fontSize: 13, color: "var(--metin-soluk)", whiteSpace: "nowrap" }}>{denetimTarihFormatla(k.tarih)}</td>
+                      <td style={{ fontWeight: 600 }}>{k.kullanici || "—"}</td>
+                      <td>
+                        <span className={`rozet ${DENETIM_ROZET[k.islem] || "rozet-gri"}`}>{DENETIM_ETIKET[k.islem] || k.islem}</span>
+                      </td>
+                      <td style={{ fontSize: 13.5 }}>{k.aciklama}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

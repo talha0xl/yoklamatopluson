@@ -29,6 +29,11 @@ export default function KabukNav({ modulLinkleri, istatistikVarMi, mesajVarMi, i
             İstatistik
           </Link>
         )}
+        {istatistikVarMi && (
+          <Link href="/sunum" className={yol === "/sunum" ? "aktif" : ""}>
+            🖥️ Sunum Modu
+          </Link>
+        )}
         {mesajVarMi && (
           <Link href="/mesaj" className={yol === "/mesaj" ? "aktif" : ""}>
             Veli Bilgilendirme

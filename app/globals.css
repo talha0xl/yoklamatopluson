@@ -37,6 +37,14 @@
      var(--lacivert) kullanılıyor, çünkü o yüzeyler her zaman koyu lacivert
      kalıyor. */
   --baslik: var(--lacivert);
+  /* Kırmızı METİN rengi: açık temada marka kırmızısıyla aynı (beyaz zemin
+     üstünde okunaklı), koyu temada arkaplan koyulaştığı için daha açık bir
+     tona dönüyor (aşağıda) — aynı --baslik mantığı. ARKAPLAN olarak
+     kullanılan yerlerde (izinsiz butonu vb.) hâlâ var(--kirmizi) kullanılıyor. */
+  --kirmizi-metin: var(--kirmizi);
+  --yesil-metin: var(--yesil);
+  --mavi-metin: var(--mavi);
+  --amber-metin: var(--amber);
   color-scheme: light;
 }
 
@@ -64,6 +72,10 @@ html[data-tema="koyu"] {
   --hata-bg: rgba(179, 65, 59, 0.16);
   --hata-border: rgba(179, 65, 59, 0.45);
   --baslik: #a9c2e6;
+  --kirmizi-metin: #e0776f;
+  --yesil-metin: #5cb98a;
+  --mavi-metin: #6fb3d1;
+  --amber-metin: #e3b972;
   color-scheme: dark;
 }
 
@@ -207,7 +219,7 @@ input, select, textarea { font-family: inherit; }
 .btn-yesil:hover { opacity: 0.92; }
 .btn-hayalet { background: transparent; color: var(--baslik); border-color: var(--border); }
 .btn-hayalet:hover { background: var(--gri-acik); }
-.btn-tehlike { background: var(--yuzey); color: var(--kirmizi); border-color: var(--kirmizi); }
+.btn-tehlike { background: var(--yuzey); color: var(--kirmizi-metin); border-color: var(--kirmizi-metin); }
 .btn-tehlike:hover { background: var(--hata-bg); }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .btn-sm { padding: 7px 12px; font-size: 13px; border-radius: 8px; }
@@ -221,11 +233,11 @@ input, select, textarea { font-family: inherit; }
 .etiket { font-size: 13px; font-weight: 600; color: var(--metin-soluk); display: block; margin-bottom: 6px; }
 
 .rozet { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 100px; font-size: 12.5px; font-weight: 700; }
-.rozet-yesil { background: var(--rozet-yesil-bg); color: var(--yesil); }
-.rozet-kirmizi { background: var(--rozet-kirmizi-bg); color: var(--kirmizi); }
-.rozet-amber { background: var(--rozet-amber-bg); color: var(--amber); }
+.rozet-yesil { background: var(--rozet-yesil-bg); color: var(--yesil-metin); }
+.rozet-kirmizi { background: var(--rozet-kirmizi-bg); color: var(--kirmizi-metin); }
+.rozet-amber { background: var(--rozet-amber-bg); color: var(--amber-metin); }
 .rozet-gri { background: var(--gri-acik); color: var(--metin-soluk); }
-.rozet-mavi { background: var(--rozet-mavi-bg); color: var(--mavi); }
+.rozet-mavi { background: var(--rozet-mavi-bg); color: var(--mavi-metin); }
 
 table { width: 100%; border-collapse: collapse; }
 th { text-align: left; font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--metin-soluk); padding: 10px 14px; border-bottom: 1.5px solid var(--border); }
@@ -254,7 +266,7 @@ tr:last-child td { border-bottom: none; }
   font-weight: 700; font-size: 13.5px; color: var(--metin-soluk); display: flex; align-items: center; gap: 6px;
 }
 .durum-btn.secili-geldi { background: var(--yesil); border-color: var(--yesil); color: #fff; }
-.durum-btn.secili-izinli { background: var(--amber); border-color: var(--amber); color: #fff; }
+.durum-btn.secili-izinli { background: var(--amber); border-color: var(--amber); color: var(--lacivert-koyu); }
 .durum-btn.secili-izinsiz { background: var(--kirmizi); border-color: var(--kirmizi); color: #fff; }
 .durum-btn.secili-mavi { background: var(--mavi); border-color: var(--mavi); color: #fff; }
 
@@ -273,7 +285,7 @@ tr:last-child td { border-bottom: none; }
 .istatistik-cubuk { height: 100%; background: var(--yesil); }
 
 .uyari { background: var(--uyari-bg); border: 1px solid var(--uyari-border); color: var(--uyari-metin); padding: 12px 16px; border-radius: 10px; font-size: 13.5px; }
-.hata { background: var(--hata-bg); border: 1px solid var(--hata-border); color: var(--kirmizi); padding: 12px 16px; border-radius: 10px; font-size: 13.5px; }
+.hata { background: var(--hata-bg); border: 1px solid var(--hata-border); color: var(--kirmizi-metin); padding: 12px 16px; border-radius: 10px; font-size: 13.5px; }
 
 .bos-durum { text-align: center; padding: 60px 20px; color: var(--metin-soluk); }
 
@@ -354,3 +366,48 @@ tr.sirdaki-satir td:first-child { padding-left: 11px; }
 .vazife-ozet-kart { background: var(--yuzey); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
 .vazife-ozet-liste { font-size: 12px; color: var(--metin-soluk); font-weight: 600; margin-bottom: 4px; }
 .vazife-ozet-kisi { font-size: 16px; font-weight: 800; color: var(--baslik); }
+
+/* ============================================================
+   Sunum Modu — projeksiyonda uzaktan okunabilsin diye her zaman
+   koyu lacivert zemin + büyük yazı, sitenin açık/koyu tema tercihinden
+   BAĞIMSIZ (bilerek sabit tutuluyor, en yüksek kontrast için).
+   ============================================================ */
+.sunum-sayfa {
+  min-height: 100vh; background: var(--lacivert-koyu); color: #fff;
+  display: flex; flex-direction: column; padding: clamp(20px, 4vw, 56px);
+  font-family: var(--font-body);
+}
+.sunum-ust { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: clamp(24px, 5vh, 56px); }
+.sunum-org { display: flex; align-items: center; gap: 14px; }
+.sunum-org img { height: clamp(32px, 4vw, 52px); }
+.sunum-org-metin { font-family: var(--font-display); font-weight: 800; font-size: clamp(16px, 2vw, 24px); }
+.sunum-saat-blok { text-align: right; }
+.sunum-tarih { font-size: clamp(13px, 1.4vw, 18px); color: rgba(255,255,255,0.65); font-weight: 600; }
+.sunum-saat { font-family: var(--font-display); font-size: clamp(24px, 3vw, 40px); font-weight: 800; line-height: 1.1; }
+.sunum-kontroller { display: flex; gap: 8px; margin-top: 10px; justify-content: flex-end; }
+.sunum-kontrol-btn {
+  background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); color: #fff;
+  border-radius: 100px; padding: 7px 14px; font-size: 12.5px; font-weight: 700; cursor: pointer;
+}
+.sunum-kontrol-btn:hover { background: rgba(255,255,255,0.16); }
+.sunum-bolum-baslik {
+  font-family: var(--font-display); font-size: clamp(15px, 1.6vw, 20px); font-weight: 700;
+  color: rgba(255,255,255,0.75); margin: clamp(20px, 3vh, 36px) 0 clamp(10px, 1.6vh, 18px);
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.sunum-izgara { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: clamp(12px, 1.6vw, 22px); }
+.sunum-kart {
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 18px;
+  padding: clamp(18px, 2.2vw, 30px); text-align: center;
+}
+.sunum-kart-sayi { font-family: var(--font-display); font-size: clamp(40px, 6vw, 84px); font-weight: 800; line-height: 1; }
+.sunum-kart-etiket { font-size: clamp(13px, 1.3vw, 17px); font-weight: 700; margin-top: 10px; color: rgba(255,255,255,0.75); }
+.sunum-kart-oran { font-size: clamp(13px, 1.2vw, 16px); color: rgba(255,255,255,0.55); margin-top: 4px; }
+.sunum-vazife-izgara { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 14px; }
+.sunum-vazife-kart { background: rgba(255,255,255,0.06); border-radius: 14px; padding: 16px 18px; }
+.sunum-vazife-liste { font-size: clamp(12px, 1.1vw, 14px); color: rgba(255,255,255,0.6); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+.sunum-vazife-kisi { font-family: var(--font-display); font-size: clamp(18px, 2vw, 26px); font-weight: 800; margin-top: 4px; }
+.sunum-canli { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: rgba(255,255,255,0.5); margin-top: auto; padding-top: 24px; }
+.sunum-canli-nokta { width: 8px; height: 8px; border-radius: 50%; background: #4cd67a; animation: sunum-nabiz 2s infinite; }
+@keyframes sunum-nabiz { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+.sunum-bos { color: rgba(255,255,255,0.5); font-size: 15px; }
