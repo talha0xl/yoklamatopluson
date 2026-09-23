@@ -22,6 +22,19 @@ function bugunUzun() {
   return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
 }
 
+// HTTP başlıkları (Content-Disposition) sadece ISO-8859-1 (Latin-1) karakter
+// kabul eder — Türkçe'ye özgü ş, ı, ğ, İ, Ş, Ğ bu aralığın dışında kalıyor ve
+// header'a ham hâliyle konursa sunucu tarafında "ByteString" hatasıyla tüm
+// isteği çökertiyor. Dosya adını header'a koymadan önce güvenli ASCII'ye
+// çeviriyoruz — PDF'in İÇERİĞİ (metinler) bundan etkilenmiyor, sadece
+// tarayıcının önerdiği dosya adı aksansız oluyor.
+const TURKCE_HARF_ESLESTIRME = { ş: "s", Ş: "S", ı: "i", İ: "I", ğ: "g", Ğ: "G", ü: "u", Ü: "U", ö: "o", Ö: "O", ç: "c", Ç: "C" };
+function dosyaAdiGuvenliYap(metin) {
+  return metin
+    .replace(/[şŞıİğĞüÜöÖçÇ]/g, (h) => TURKCE_HARF_ESLESTIRME[h] ?? "-")
+    .replace(/[^\x20-\x7E]/g, "-");
+}
+
 // GET /api/istatistik/pdf?kaynak=yoklama&grup_id=...&tur_id=...&baslangic=...&bitis=...
 // Seçilen grup + tarih aralığındaki her öğrenci için bir sayfalık, resmi
 // görünümlü "veli mektubu" üretir — tek bir PDF'te, öğrenci başına bir sayfa.
@@ -55,24 +68,37 @@ export async function GET(req) {
 
   const baslik = kaynak === "namaz" ? "Namaz Yoklama Durumu" : "Yoklama Durumu";
 
-  const doc = new PDFDocument({ size: "A4", margin: 50 });
-  doc.registerFont("gövde", FONT_REGULAR);
-  doc.registerFont("kalın", FONT_BOLD);
+  // PDF üretimi (pdfkit + gömülü font dosyaları) burada tek bir try/catch
+  // içinde — sunucuda beklenmedik bir hata olursa (ör. font dosyası pakette
+  // bulunamazsa) kullanıcıya boş/anlamsız "Mektup oluşturulamadı" yerine
+  // gerçek sebebi gösteren bir mesaj dönsün diye.
+  let buffer;
+  try {
+    const doc = new PDFDocument({ size: "A4", margin: 50 });
+    doc.registerFont("gövde", FONT_REGULAR);
+    doc.registerFont("kalın", FONT_BOLD);
 
-  const parcalar = [];
-  doc.on("data", (c) => parcalar.push(c));
-  const bittiSoz = new Promise((resolve) => doc.on("end", resolve));
+    const parcalar = [];
+    doc.on("data", (c) => parcalar.push(c));
+    const bittiSoz = new Promise((resolve) => doc.on("end", resolve));
 
-  sonuc.forEach((s, i) => {
-    if (i > 0) doc.addPage();
-    sayfaCiz(doc, s, { grupAdi, turAdi, baslik, kaynak, baslangic, bitis });
-  });
+    sonuc.forEach((s, i) => {
+      if (i > 0) doc.addPage();
+      sayfaCiz(doc, s, { grupAdi, turAdi, baslik, kaynak, baslangic, bitis });
+    });
 
-  doc.end();
-  await bittiSoz;
-  const buffer = Buffer.concat(parcalar);
+    doc.end();
+    await bittiSoz;
+    buffer = Buffer.concat(parcalar);
+  } catch (err) {
+    console.error("Veli mektubu PDF üretilirken hata:", err);
+    return NextResponse.json(
+      { error: `PDF üretilemedi: ${err?.message || "bilinmeyen bir sunucu hatası oluştu"}` },
+      { status: 500 }
+    );
+  }
 
-  const dosyaAdi = `veli-mektubu-${grupAdi}-${baslangic}-${bitis}.pdf`.replace(/\s+/g, "-");
+  const dosyaAdi = dosyaAdiGuvenliYap(`veli-mektubu-${grupAdi}-${baslangic}-${bitis}.pdf`.replace(/\s+/g, "-"));
   return new NextResponse(buffer, {
     headers: {
       "Content-Type": "application/pdf",

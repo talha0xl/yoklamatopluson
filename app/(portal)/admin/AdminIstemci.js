@@ -805,13 +805,6 @@ function YedeklePaneli() {
           )}
         </div>
       </div>
-
-      <div className="uyari">
-        Ekstra güvence için Supabase'in kendi otomatik yedeklemesini de kontrol edin: Supabase panelinizde
-        Project Settings → Database → Backups bölümünden hangi plandaysanız ona göre günlük yedek alınıp
-        alınmadığını görebilirsiniz — ücretsiz planda bu özellik sınırlıdır. Emin değilseniz o ekranın görüntüsünü
-        atın, birlikte bakalım.
-      </div>
     </div>
   );
 }
