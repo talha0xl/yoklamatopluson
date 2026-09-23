@@ -6,6 +6,7 @@ const SEKMELER = [
   { id: "ogrenciler", etiket: "Öğrenciler" },
   { id: "kodlar", etiket: "Erişim Kodları" },
   { id: "gruplar", etiket: "Gruplar" },
+  { id: "yedekle", etiket: "Yedekle" },
 ];
 
 export default function AdminIstemci() {
@@ -26,6 +27,7 @@ export default function AdminIstemci() {
       {sekme === "ogrenciler" && <OgrencilerPaneli />}
       {sekme === "kodlar" && <KodlarPaneli />}
       {sekme === "gruplar" && <GruplarPaneli />}
+      {sekme === "yedekle" && <YedeklePaneli />}
     </>
   );
 }
@@ -71,6 +73,13 @@ function OgrencilerPaneli() {
   const [tumOgrenciler, setTumOgrenciler] = useState([]);
   const [yukleniyor, setYukleniyor] = useState(true);
   const [acikId, setAcikId] = useState(null);
+
+  const [duzenlenenId, setDuzenlenenId] = useState(null);
+  const [duzenleAdSoyad, setDuzenleAdSoyad] = useState("");
+  const [duzenleGrupId, setDuzenleGrupId] = useState(null);
+  const [duzenleYer, setDuzenleYer] = useState("");
+  const [duzenleYakinlar, setDuzenleYakinlar] = useState([]);
+  const [kaydediliyor, setKaydediliyor] = useState(false);
 
   const [formAdSoyad, setFormAdSoyad] = useState("");
   const [formYasadigiYer, setFormYasadigiYer] = useState("");
@@ -147,6 +156,69 @@ function OgrencilerPaneli() {
     getir();
   }
 
+  function duzenlemeyeBasla(o) {
+    setDuzenlenenId(o.id);
+    setAcikId(o.id);
+    setDuzenleAdSoyad(o.ad_soyad || "");
+    setDuzenleGrupId(o.grup_id);
+    setDuzenleYer(o.yasadigi_yer || "");
+    setDuzenleYakinlar(
+      ogrenciYakinlari(o).map((y) => ({
+        id: y.id,
+        yakinlik: y.yakinlik || "",
+        ad_soyad: y.ad_soyad || "",
+        telefon: y.telefon || "",
+        meslek: y.meslek || "",
+        yasadigi_yer: y.yasadigi_yer || "",
+      }))
+    );
+  }
+
+  function duzenlemeyiIptalEt() {
+    setDuzenlenenId(null);
+  }
+
+  function duzenleYakinEkle() {
+    setDuzenleYakinlar((t) => [...t, { ...BOS_YAKIN }]);
+  }
+  function duzenleYakinSil(i) {
+    setDuzenleYakinlar((t) => t.filter((_, idx) => idx !== i));
+  }
+  function duzenleYakinDegistir(i, alan, deger) {
+    setDuzenleYakinlar((t) => t.map((y, idx) => (idx === i ? { ...y, [alan]: deger } : y)));
+  }
+
+  async function duzenlemeyiKaydet(e) {
+    e.preventDefault();
+    if (!duzenleAdSoyad.trim() || !duzenleGrupId) return;
+    setKaydediliyor(true);
+    await fetch(`/api/ogrenciler/${duzenlenenId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ad_soyad: duzenleAdSoyad, grup_id: duzenleGrupId, yasadigi_yer: duzenleYer }),
+    });
+    for (const y of duzenleYakinlar) {
+      if (!y.yakinlik.trim() && !y.ad_soyad.trim() && !y.telefon.trim()) continue;
+      const gercekKayit = typeof y.id === "string" && !y.id.startsWith("eski-");
+      if (gercekKayit) {
+        await fetch(`/api/ogrenci-yakinlari/${y.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ yakinlik: y.yakinlik, ad_soyad: y.ad_soyad, telefon: y.telefon, meslek: y.meslek, yasadigi_yer: y.yasadigi_yer }),
+        });
+      } else {
+        await fetch("/api/ogrenci-yakinlari", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ogrenci_id: duzenlenenId, yakinlik: y.yakinlik, ad_soyad: y.ad_soyad, telefon: y.telefon, meslek: y.meslek, yasadigi_yer: y.yasadigi_yer }),
+        });
+      }
+    }
+    setKaydediliyor(false);
+    setDuzenlenenId(null);
+    getir();
+  }
+
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 340px", gap: 20 }}>
       <div className="kart">
@@ -181,8 +253,11 @@ function OgrencilerPaneli() {
                       <div className="ogrenci-detay">{ogrenciVeliOzeti(o)}</div>
                     </div>
                     <div style={{ display: "flex", gap: 8 }}>
-                      <button className="btn btn-hayalet btn-sm" onClick={(e) => { e.stopPropagation(); setAcikId(acik ? null : o.id); }}>
+                      <button className="btn btn-hayalet btn-sm" onClick={(e) => { e.stopPropagation(); setAcikId(acik ? null : o.id); if (duzenlenenId === o.id) setDuzenlenenId(null); }}>
                         {acik ? "Kapat" : "Detay"}
+                      </button>
+                      <button className="btn btn-hayalet btn-sm" onClick={(e) => { e.stopPropagation(); duzenlemeyeBasla(o); }}>
+                        Düzenle
                       </button>
                       <button className="btn btn-tehlike btn-sm" onClick={(e) => { e.stopPropagation(); sil(o.id); }}>
                         Kaldır
@@ -190,7 +265,69 @@ function OgrencilerPaneli() {
                     </div>
                   </div>
 
-                  {acik && (
+                  {acik && duzenlenenId === o.id && (
+                    <form onSubmit={duzenlemeyiKaydet} style={{ padding: "0 4px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+                      <div>
+                        <label className="etiket">Ad Soyad</label>
+                        <input className="girdi" value={duzenleAdSoyad} onChange={(e) => setDuzenleAdSoyad(e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="etiket">Grup</label>
+                        <select className="girdi" value={duzenleGrupId || ""} onChange={(e) => setDuzenleGrupId(e.target.value)}>
+                          {gruplar.map((g) => (
+                            <option key={g.id} value={g.id}>
+                              {g.isim}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="etiket">Yaşadığı yer</label>
+                        <input className="girdi" value={duzenleYer} onChange={(e) => setDuzenleYer(e.target.value)} placeholder="Örn. Fatih, İstanbul" />
+                      </div>
+
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "var(--baslik)", marginTop: 4 }}>Veliler / yakınlar</div>
+                      {duzenleYakinlar.map((y, i) => (
+                        <div key={y.id || `yeni-${i}`} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+                          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                            <input
+                              className="girdi"
+                              style={{ flex: 1 }}
+                              value={y.yakinlik}
+                              onChange={(e) => duzenleYakinDegistir(i, "yakinlik", e.target.value)}
+                              placeholder="Yakınlığı — Anne, Baba, Amca..."
+                            />
+                            <button type="button" className="btn btn-tehlike btn-sm" onClick={() => duzenleYakinSil(i)} title="Bu yakını kaldır">
+                              ✕
+                            </button>
+                          </div>
+                          <input className="girdi" value={y.ad_soyad} onChange={(e) => duzenleYakinDegistir(i, "ad_soyad", e.target.value)} placeholder="İsim soyisim" />
+                          <input className="girdi" value={y.telefon} onChange={(e) => duzenleYakinDegistir(i, "telefon", e.target.value)} placeholder="WhatsApp no — 05XX XXX XX XX" />
+                          <input className="girdi" value={y.meslek} onChange={(e) => duzenleYakinDegistir(i, "meslek", e.target.value)} placeholder="Mesleği (isteğe bağlı)" />
+                          <input
+                            className="girdi"
+                            value={y.yasadigi_yer}
+                            onChange={(e) => duzenleYakinDegistir(i, "yasadigi_yer", e.target.value)}
+                            placeholder="Yaşadığı yer (öğrenciden farklıysa)"
+                          />
+                        </div>
+                      ))}
+                      <button type="button" className="btn btn-hayalet btn-blok" onClick={duzenleYakinEkle}>
+                        + Veli Ekle
+                      </button>
+
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button className="btn btn-lacivert" disabled={kaydediliyor}>
+                          {kaydediliyor ? "Kaydediliyor..." : "Kaydet"}
+                        </button>
+                        <button type="button" className="btn btn-hayalet" onClick={duzenlemeyiIptalEt}>
+                          Vazgeç
+                        </button>
+                      </div>
+                    </form>
+                  )}
+
+                  {acik && duzenlenenId !== o.id && (
                     <div style={{ padding: "0 4px 16px" }}>
                       {o.yasadigi_yer && (
                         <div style={{ marginBottom: 10, fontSize: 13.5 }}>
@@ -571,12 +708,35 @@ function GruplarPaneli() {
               {ekleniyor ? "Ekleniyor..." : "Ekle"}
             </button>
           </form>
-          <div className="uyari" style={{ marginTop: 18 }}>
-            WhatsApp'ı tamamen otomatik (tek tuşla, tıklamadan) toplu göndermek isterseniz, Meta WhatsApp
-            Business Cloud API için işletme hesabı başvurusu gerekir. Şu anki sistem her veli için hazır
-            mesajlı bağlantı üretir, gönder'e siz basarsınız.
-          </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function YedeklePaneli() {
+  return (
+    <div style={{ maxWidth: 620 }}>
+      <div className="kart" style={{ marginBottom: 20 }}>
+        <div className="kart-ic">
+          <h3 style={{ fontSize: 16, marginBottom: 10 }}>Tüm veriyi indir</h3>
+          <p style={{ fontSize: 13.5, color: "var(--metin-soluk)", marginBottom: 16 }}>
+            Öğrenciler, veliler, yoklama kayıtları, görev listeleri, erişim kodları — sistemdeki her şeyin tek bir
+            dosyaya (.json) tam dökümü. Bir yere (bilgisayarınıza, Google Drive'a) kaydedip saklayın. Ne sıklıkla
+            indireceğiniz size kalmış — mesela haftada bir indirip tarihli bir klasörde tutmanız önerilir.
+          </p>
+          <a href="/api/yedek" download className="btn btn-lacivert">
+            ⬇️ Yedeği indir (.json)
+          </a>
+        </div>
+      </div>
+      <div className="uyari">
+        Bu indirilen dosya, verinin elinizdeki bir kopyası — sistemden bir şey yanlışlıkla silinirse, bu dosyaya
+        bakıp elle geri girebilirsiniz (otomatik geri yükleme yapmaz). Asıl güvence Supabase'in kendi otomatik
+        yedeklemesi: Supabase panelinizde Project Settings → Database → Backups bölümünden hangi plandaysanız ona
+        göre günlük yedek alınıp alınmadığını görebilirsiniz — ücretsiz planda bu özellik sınırlıdır, düzenli
+        otomatik yedek için ücretli plana geçmek gerekebilir. Emin değilseniz Supabase panelinizin ekran
+        görüntüsünü atın, birlikte bakalım.
       </div>
     </div>
   );

@@ -33,6 +33,7 @@ export default function IstatistikIstemci({ baslangicGruplar, baslangicTurler, b
   const [sonuc, setSonuc] = useState([]);
   const [yukleniyor, setYukleniyor] = useState(true);
   const [kisiAra, setKisiAra] = useState("");
+  const [karneIndiriliyor, setKarneIndiriliyor] = useState(false);
 
   const getir = useCallback(() => {
     if (kaynak === "gorev") {
@@ -93,6 +94,52 @@ export default function IstatistikIstemci({ baslangicGruplar, baslangicTurler, b
   const gosterilenSonuc = kisiAra.trim()
     ? sonuc.filter((s) => s.ogrenci.ad_soyad.toLocaleLowerCase("tr").includes(kisiAra.trim().toLocaleLowerCase("tr")))
     : sonuc;
+
+  async function karneIndir() {
+    setKarneIndiriliyor(true);
+    try {
+      const ExcelJS = (await import("exceljs")).default;
+      const wb = new ExcelJS.Workbook();
+      const baslikMetni = kaynak === "gorev" ? (listeler.find((l) => l.id === listeId)?.isim || "Görev") : (gruplar.find((g) => g.id === grupId)?.isim || "Grup");
+      const ws = wb.addWorksheet(baslikMetni.slice(0, 30) || "Karne");
+
+      ws.addRow([`${baslikMetni} — ${basliklar.oranEtiket} Karnesi`]);
+      ws.getRow(1).font = { bold: true, size: 14 };
+      ws.addRow([`Tarih aralığı: ${baslangic} — ${bitis}`]);
+      ws.getRow(2).font = { italic: true, color: { argb: "FF666666" } };
+      ws.addRow([]);
+
+      const basHucre = [kaynak === "gorev" ? "Kişi" : "Öğrenci", ...basliklar.sutunlar.map((su) => su.baslik), basliklar.oranEtiket];
+      const basSatir = ws.addRow(basHucre);
+      basSatir.font = { bold: true, color: { argb: "FFFFFFFF" } };
+      basSatir.eachCell((c) => {
+        c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1B2A4A" } };
+        c.alignment = { horizontal: "center" };
+      });
+
+      gosterilenSonuc.forEach((s) => {
+        const satir = [s.ogrenci.ad_soyad, ...basliklar.sutunlar.map((su) => s[su.alan] ?? 0), s.oran === null ? "Kayıt yok" : `%${s.oran}`];
+        ws.addRow(satir);
+      });
+
+      ws.columns.forEach((col, i) => {
+        col.width = i === 0 ? 26 : 16;
+      });
+
+      const buf = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `karne-${baslikMetni}-${baslangic}-${bitis}.xlsx`.replace(/\s+/g, "-");
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } finally {
+      setKarneIndiriliyor(false);
+    }
+  }
 
   return (
     <>
@@ -166,15 +213,22 @@ export default function IstatistikIstemci({ baslangicGruplar, baslangicTurler, b
         </div>
       </div>
 
-      {sonuc.length > 3 && (
-        <input
-          className="girdi"
-          style={{ marginBottom: 14, maxWidth: 280 }}
-          placeholder="Kişi ara..."
-          value={kisiAra}
-          onChange={(e) => setKisiAra(e.target.value)}
-        />
-      )}
+      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center", marginBottom: 14 }}>
+        {sonuc.length > 3 && (
+          <input
+            className="girdi"
+            style={{ maxWidth: 280 }}
+            placeholder="Kişi ara..."
+            value={kisiAra}
+            onChange={(e) => setKisiAra(e.target.value)}
+          />
+        )}
+        {gosterilenSonuc.length > 0 && (
+          <button className="btn btn-hayalet" onClick={karneIndir} disabled={karneIndiriliyor} style={{ marginLeft: "auto" }}>
+            {karneIndiriliyor ? "Hazırlanıyor..." : "📊 Karneyi Excel indir"}
+          </button>
+        )}
+      </div>
 
       <div className="kart">
         <div className="kart-ic">
