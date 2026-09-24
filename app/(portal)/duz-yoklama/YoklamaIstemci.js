@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useAraliklaTazele } from "../../../lib/useAraliklaTazele";
 
 function bugun() {
@@ -23,6 +23,9 @@ export default function YoklamaIstemci({ isAdmin, baslangicTurler, baslangicGrup
   const [sebepAcikId, setSebepAcikId] = useState(null);
   const [sebepTaslak, setSebepTaslak] = useState("");
   const [kayitHata, setKayitHata] = useState("");
+  // Sunucuya gönderilmiş ama henüz cevabı gelmemiş (devam eden) işaretlemeleri
+  // tutar; arka plandaki sessiz tazeleme bunları eski veriyle ezmesin diye.
+  const beklemedekiler = useRef(new Set());
 
   const turleriGetir = useCallback(() => {
     fetch("/api/yoklama-turleri")
@@ -43,7 +46,16 @@ export default function YoklamaIstemci({ isAdmin, baslangicTurler, baslangicGrup
           setOgrenciler(d.ogrenciler || []);
           const map = {};
           (d.kayitlar || []).forEach((k) => (map[k.ogrenci_id] = k));
-          setKayitMap(map);
+          // Devam eden (henüz cevabı gelmemiş) işaretlemeleri sunucudan gelen
+          // eski veriyle ezme — mevcut yerel durumu koru.
+          setKayitMap((eski) => {
+            const birlesik = { ...map };
+            beklemedekiler.current.forEach((anahtar) => {
+              if (anahtar in eski) birlesik[anahtar] = eski[anahtar];
+              else delete birlesik[anahtar];
+            });
+            return birlesik;
+          });
           if (!sessiz) setYukleniyor(false);
         });
     },
@@ -59,9 +71,14 @@ export default function YoklamaIstemci({ isAdmin, baslangicTurler, baslangicGrup
   // günceller, böylece dokunuş anında tepki veriyormuş gibi hissettirir.
   // Cevap gelince gerçek kayıtla senkronlanır; hata olursa geri alınır.
   async function isaretle(ogrenciId, durum, notMetni) {
+    // İzinli dışında bir duruma geçiliyorsa, o öğrencinin açık "izin sebebi"
+    // kutusu varsa kapat — yoksa altında asılı kalıyordu.
+    if (durum !== "izinli" && sebepAcikId === ogrenciId) setSebepAcikId(null);
+
     const oncekiKayit = kayitMap[ogrenciId];
     const notDegeri = durum === "izinli" ? (notMetni ?? oncekiKayit?.not_metni ?? null) : null;
 
+    beklemedekiler.current.add(ogrenciId);
     setKayitMap((m) => ({ ...m, [ogrenciId]: { ...(m[ogrenciId] || {}), durum, not_metni: notDegeri } }));
 
     try {
@@ -82,17 +99,33 @@ export default function YoklamaIstemci({ isAdmin, baslangicTurler, baslangicGrup
       });
       setKayitHata(`Kaydedilemedi, işaretiniz geri alındı (${err.message}).`);
       setTimeout(() => setKayitHata(""), 8000);
+    } finally {
+      beklemedekiler.current.delete(ogrenciId);
     }
   }
 
   async function isaretiSil(ogrenciId) {
+    const oncekiKayit = kayitMap[ogrenciId];
+    beklemedekiler.current.add(ogrenciId);
     setKayitMap((m) => {
       const yeni = { ...m };
       delete yeni[ogrenciId];
       return yeni;
     });
     if (sebepAcikId === ogrenciId) setSebepAcikId(null);
-    await fetch(`/api/yoklama?ogrenci_id=${ogrenciId}&tarih=${tarih}&tur_id=${turId}`, { method: "DELETE" });
+    try {
+      const res = await fetch(`/api/yoklama?ogrenci_id=${ogrenciId}&tarih=${tarih}&tur_id=${turId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("silinemedi");
+    } catch (err) {
+      setKayitMap((m) => {
+        if (!oncekiKayit) return m;
+        return { ...m, [ogrenciId]: oncekiKayit };
+      });
+      setKayitHata("Sıfırlanamadı, işaretiniz geri getirildi. Tekrar deneyin.");
+      setTimeout(() => setKayitHata(""), 8000);
+    } finally {
+      beklemedekiler.current.delete(ogrenciId);
+    }
   }
 
   function izinliTiklandi(ogrenciId) {

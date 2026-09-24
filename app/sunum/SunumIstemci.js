@@ -4,7 +4,7 @@ import Link from "next/link";
 
 const GUNLER = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"];
 const AYLAR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
-const YENILEME_MS = 15 * 60 * 1000; // 15 dakika
+const YENILEME_MS = 15 * 1000; // 15 saniye
 
 function saatFormatla(d) {
   return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
@@ -50,7 +50,7 @@ export default function SunumIstemci({ ilkVeri }) {
   }, [grupId, turId]);
 
   // Grup ya da tür değiştiğinde hemen yenile (kişi seçim yaptığında sonucu
-  // görsün), sonrasında normal 15 dakikalık döngü devam etsin.
+  // görsün), sonrasında normal 15 saniyelik döngü devam etsin.
   useEffect(() => {
     yenile();
   }, [yenile]);
@@ -168,7 +168,7 @@ export default function SunumIstemci({ ilkVeri }) {
       )}
 
       <div className="sunum-canli">
-        <span className="sunum-canli-nokta" /> Canlı — her 15 dakikada güncellenir
+        <span className="sunum-canli-nokta" /> Canlı — her 15 saniyede güncellenir
       </div>
     </div>
   );

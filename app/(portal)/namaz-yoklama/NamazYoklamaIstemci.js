@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useAraliklaTazele } from "../../../lib/useAraliklaTazele";
 
 const VAKITLER = [
@@ -41,6 +41,14 @@ export default function NamazYoklamaIstemci({ baslangicGruplar }) {
   const [sebepTaslak, setSebepTaslak] = useState("");
   const [kayitHata, setKayitHata] = useState("");
 
+  // Sunucuya henüz cevap gelmemiş (işaretleme ya da sıfırlama) anahtarları
+  // tutar — arka plandaki sessiz tazeleme bunları eski (henüz güncellenmemiş)
+  // sunucu verisiyle EZMESİN diye. Bu olmadan: "Sıfırla"ya basılır, ekran
+  // anında boşalır, ama silme isteği sunucuya ulaşmadan birkaç saniye içinde
+  // arka plan tazelemesi eski kaydı geri getirebiliyordu — "bazen
+  // sıfırlamıyor" hissi böyle oluşuyordu.
+  const beklemedekiler = useRef(new Set());
+
   const tazele = useCallback(
     (sessiz) => {
       if (!grupId || !tarih) return;
@@ -51,7 +59,14 @@ export default function NamazYoklamaIstemci({ baslangicGruplar }) {
           setOgrenciler(d.ogrenciler || []);
           const map = {};
           (d.kayitlar || []).forEach((k) => (map[`${k.ogrenci_id}:${k.vakit}`] = k));
-          setKayitMap(map);
+          setKayitMap((eski) => {
+            const birlesik = { ...map };
+            beklemedekiler.current.forEach((anahtar) => {
+              if (anahtar in eski) birlesik[anahtar] = eski[anahtar];
+              else delete birlesik[anahtar];
+            });
+            return birlesik;
+          });
           if (!sessiz) setYukleniyor(false);
         });
     },
@@ -72,6 +87,12 @@ export default function NamazYoklamaIstemci({ baslangicGruplar }) {
     const oncekiKayit = kayitMap[anahtar];
     const notDegeri = durum === "izinli" ? (notMetni ?? oncekiKayit?.not_metni ?? null) : null;
 
+    // İzinli dışında bir duruma geçiliyorsa, açık kalmış "izin sebebi" giriş
+    // kutusunu da kapat — aksi halde İzinli'ye basıp sonra Geldi'ye
+    // basıldığında sebep kutusu ekranda asılı kalıyordu.
+    if (durum !== "izinli" && sebepAcikAnahtar === anahtar) setSebepAcikAnahtar(null);
+
+    beklemedekiler.current.add(anahtar);
     setKayitMap((m) => ({
       ...m,
       [anahtar]: { ...(m[anahtar] || {}), ogrenci_id: ogrenciId, tarih, vakit, durum, not_metni: notDegeri },
@@ -99,18 +120,31 @@ export default function NamazYoklamaIstemci({ baslangicGruplar }) {
         `Kaydedilemedi, işaretiniz geri alındı (${err.message}). Supabase'de v7/v9 SQL güncellemesi çalıştırılmamış olabilir.`
       );
       setTimeout(() => setKayitHata(""), 8000);
+    } finally {
+      beklemedekiler.current.delete(anahtar);
     }
   }
 
   async function isaretiSil(ogrenciId) {
     const anahtar = `${ogrenciId}:${vakit}`;
+    const oncekiKayit = kayitMap[anahtar];
+    beklemedekiler.current.add(anahtar);
     setKayitMap((m) => {
       const yeni = { ...m };
       delete yeni[anahtar];
       return yeni;
     });
     if (sebepAcikAnahtar === anahtar) setSebepAcikAnahtar(null);
-    await fetch(`/api/namaz-yoklama?ogrenci_id=${ogrenciId}&tarih=${tarih}&vakit=${vakit}`, { method: "DELETE" });
+    try {
+      const res = await fetch(`/api/namaz-yoklama?ogrenci_id=${ogrenciId}&tarih=${tarih}&vakit=${vakit}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("silme hatası");
+    } catch {
+      if (oncekiKayit) setKayitMap((m) => ({ ...m, [anahtar]: oncekiKayit }));
+      setKayitHata("Sıfırlanamadı, işaretiniz geri getirildi. Tekrar deneyin.");
+      setTimeout(() => setKayitHata(""), 8000);
+    } finally {
+      beklemedekiler.current.delete(anahtar);
+    }
   }
 
   function izinliTiklandi(ogrenciId) {

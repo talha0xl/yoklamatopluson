@@ -18,6 +18,11 @@ const KAYNAKLAR = [
 
 const VAKIT_ETIKET = { sabah: "Sabah", ogle: "Öğle", ikindi: "İkindi", aksam: "Akşam", yatsi: "Yatsı" };
 
+// Grup seçicide "Tümü" seçildiğinde gerçek bir grup id'si değil bu sabit
+// kullanılır; API'ye gönderilirken grup_id parametresi hiç eklenmez, böylece
+// sunucu tüm öğrencileri (grup grup sıralı) döner.
+const TUMU = "__tumu__";
+
 function tarihFormatla(t) {
   if (!t) return "";
   const [yil, ay, gun] = t.split("-");
@@ -62,7 +67,8 @@ export default function IstatistikIstemci({ baslangicGruplar, baslangicTurler, b
     if (!grupId) return;
     if (kaynak === "yoklama" && !turId) return;
     setYukleniyor(true);
-    const params = new URLSearchParams({ kaynak, grup_id: grupId, baslangic, bitis });
+    const params = new URLSearchParams({ kaynak, baslangic, bitis });
+    if (grupId !== TUMU) params.set("grup_id", grupId);
     if (kaynak === "yoklama") params.set("tur_id", turId);
     fetch(`/api/istatistik?${params.toString()}`)
       .then((r) => r.json())
@@ -112,7 +118,12 @@ export default function IstatistikIstemci({ baslangicGruplar, baslangicTurler, b
     try {
       const ExcelJS = (await import("exceljs")).default;
       const wb = new ExcelJS.Workbook();
-      const baslikMetni = kaynak === "gorev" ? (listeler.find((l) => l.id === listeId)?.isim || "Görev") : (gruplar.find((g) => g.id === grupId)?.isim || "Grup");
+      const baslikMetni =
+        kaynak === "gorev"
+          ? listeler.find((l) => l.id === listeId)?.isim || "Görev"
+          : grupId === TUMU
+          ? "Tüm Öğrenciler"
+          : gruplar.find((g) => g.id === grupId)?.isim || "Grup";
       const ws = wb.addWorksheet(baslikMetni.slice(0, 30) || "Karne");
 
       ws.addRow([`${baslikMetni} — ${basliklar.oranEtiket} Karnesi`]);
@@ -158,7 +169,7 @@ export default function IstatistikIstemci({ baslangicGruplar, baslangicTurler, b
     setMektupIndiriliyor(true);
     try {
       const params = new URLSearchParams({ kaynak, baslangic, bitis });
-      if (grupId) params.set("grup_id", grupId);
+      if (grupId && grupId !== TUMU) params.set("grup_id", grupId);
       if (kaynak === "yoklama" && turId) params.set("tur_id", turId);
       const res = await fetch(`/api/istatistik/pdf?${params.toString()}`);
       if (!res.ok) {
@@ -168,7 +179,7 @@ export default function IstatistikIstemci({ baslangicGruplar, baslangicTurler, b
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      const baslikMetni = gruplar.find((g) => g.id === grupId)?.isim || "Tum-Ogrenciler";
+      const baslikMetni = grupId === TUMU ? "Tum-Ogrenciler" : gruplar.find((g) => g.id === grupId)?.isim || "Tum-Ogrenciler";
       a.href = url;
       a.download = `veli-mektubu-${baslikMetni}-${baslangic}-${bitis}.pdf`.replace(/\s+/g, "-");
       document.body.appendChild(a);
@@ -226,6 +237,9 @@ export default function IstatistikIstemci({ baslangicGruplar, baslangicTurler, b
         <>
           <label className="etiket" style={{ marginBottom: 6, display: "block" }}>Grup</label>
           <div className="grup-sekme">
+            <button className={grupId === TUMU ? "aktif" : ""} onClick={() => setGrupId(TUMU)}>
+              Tümü
+            </button>
             {gruplar.map((g) => (
               <button key={g.id} className={grupId === g.id ? "aktif" : ""} onClick={() => setGrupId(g.id)}>
                 {g.isim}

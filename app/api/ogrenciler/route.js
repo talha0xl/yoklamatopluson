@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseServer } from "../../../lib/supabaseServer";
 import { denetimKaydet } from "../../../lib/denetim";
+import { kitapTakipOgrenciEkle } from "../../../lib/kitapTakipSenkron";
 
 export async function GET(req) {
   const grupId = req.nextUrl.searchParams.get("grup_id");
@@ -44,6 +45,11 @@ export async function POST(req) {
   }
 
   await denetimKaydet(supabase, { islem: "ekleme", hedefTablo: "ogrenciler", hedefId: ogrenci.id, aciklama: `${ogrenci.ad_soyad} eklendi` });
+
+  // Kitap Takip'e de otomatik ekle (sınıfın adıyla eşleşen hocaya) — bu
+  // adım başarısız olsa bile öğrenci ana portala zaten eklenmiş durumda.
+  const { data: grup } = await supabase.from("gruplar").select("isim").eq("id", body.grup_id).maybeSingle();
+  await kitapTakipOgrenciEkle(supabase, { grupIsim: grup?.isim, adSoyad: ogrenci.ad_soyad });
 
   return NextResponse.json({ ogrenci });
 }
