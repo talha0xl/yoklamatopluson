@@ -285,7 +285,7 @@ function YonetimPaneli({ listeler, onDegisti }) {
           ))}
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr) 280px", gap: 24 }}>
+        <div className="gorev-yonetim-izgara">
           <div>
             <h3 style={{ fontSize: 15, marginBottom: 12 }}>"{seciliListe?.isim}" kişileri (sıralı)</h3>
             {kisiler.length === 0 && <div className="bos-durum" style={{ padding: "20px 0" }}>Henüz kişi yok.</div>}

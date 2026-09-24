@@ -4,6 +4,7 @@ import Link from "next/link";
 
 const GUNLER = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"];
 const AYLAR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
+const YENILEME_MS = 15 * 60 * 1000; // 15 dakika
 
 function saatFormatla(d) {
   return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
@@ -18,17 +19,46 @@ export default function SunumIstemci({ ilkVeri }) {
   const [tamEkran, setTamEkran] = useState(false);
   const sarmalRef = useRef(null);
 
+  // Sunuma bakan kişi neye bakacağını kendisi seçsin diye: grup (Toplu
+  // Talebe ya da tek bir grup) ve yoklama türü seçimi.
+  const [gruplar, setGruplar] = useState([]);
+  const [turler, setTurler] = useState([]);
+  const [grupId, setGrupId] = useState("");
+  const [turId, setTurId] = useState("");
+  const ilkTurAyarlandi = useRef(false);
+
+  useEffect(() => {
+    fetch("/api/gruplar").then((r) => r.json()).then((d) => setGruplar(d.gruplar || []));
+    fetch("/api/yoklama-turleri").then((r) => r.json()).then((d) => {
+      const t = d.turler || [];
+      setTurler(t);
+      if (!ilkTurAyarlandi.current && t.length) {
+        ilkTurAyarlandi.current = true;
+        setTurId(t[0].id);
+      }
+    });
+  }, []);
+
   const yenile = useCallback(() => {
-    fetch("/api/sunum")
+    const params = new URLSearchParams();
+    if (grupId) params.set("grup_id", grupId);
+    if (turId) params.set("tur_id", turId);
+    fetch(`/api/sunum?${params.toString()}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => d && setVeri(d))
       .catch(() => {});
-  }, []);
+  }, [grupId, turId]);
+
+  // Grup ya da tür değiştiğinde hemen yenile (kişi seçim yaptığında sonucu
+  // görsün), sonrasında normal 15 dakikalık döngü devam etsin.
+  useEffect(() => {
+    yenile();
+  }, [yenile]);
 
   useEffect(() => {
     setSaat(new Date());
     const zamanlayici = setInterval(() => setSaat(new Date()), 1000 * 30);
-    const yenileZamanlayici = setInterval(yenile, 45_000);
+    const yenileZamanlayici = setInterval(yenile, YENILEME_MS);
     return () => {
       clearInterval(zamanlayici);
       clearInterval(yenileZamanlayici);
@@ -46,9 +76,9 @@ export default function SunumIstemci({ ilkVeri }) {
   const yoklamaOran = veri.yoklama && veri.yoklama.toplamIsaretlenen > veri.yoklama.izinli
     ? Math.round((veri.yoklama.geldi / (veri.yoklama.toplamIsaretlenen - veri.yoklama.izinli || 1)) * 100)
     : null;
-  const namazOran = veri.namaz && veri.namaz.toplamIsaretlenen > veri.namaz.izinli
-    ? Math.round(((veri.namaz.kildi + veri.namaz.gecKildi) / (veri.namaz.toplamIsaretlenen - veri.namaz.izinli || 1)) * 100)
-    : null;
+
+  const seciliGrupAdi = gruplar.find((g) => g.id === grupId)?.isim || "Toplu Talebe";
+  const seciliTurAdi = turler.find((t) => t.id === turId)?.isim || "";
 
   return (
     <div className="sunum-sayfa" ref={sarmalRef}>
@@ -71,62 +101,52 @@ export default function SunumIstemci({ ilkVeri }) {
         </div>
       </div>
 
-      <div className="sunum-bolum-baslik">Bugün — Toplam {veri.toplamOgrenci} Öğrenci</div>
+      <div className="sunum-secim-cubugu">
+        <div className="sunum-secim-alan">
+          <label>Grup</label>
+          <select value={grupId} onChange={(e) => setGrupId(e.target.value)}>
+            <option value="">Toplu Talebe</option>
+            {gruplar.map((g) => (
+              <option key={g.id} value={g.id}>{g.isim}</option>
+            ))}
+          </select>
+        </div>
+        <div className="sunum-secim-alan">
+          <label>Yoklama Türü</label>
+          <select value={turId} onChange={(e) => setTurId(e.target.value)}>
+            {turler.length === 0 && <option value="">—</option>}
+            {turler.map((t) => (
+              <option key={t.id} value={t.id}>{t.isim}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="sunum-bolum-baslik">
+        {seciliGrupAdi} — {seciliTurAdi || "Yoklama"} — Toplam {veri.toplamOgrenci} Öğrenci
+      </div>
 
       {veri.yoklama && (
-        <>
-          <div className="sunum-bolum-baslik">Yoklama</div>
-          <div className="sunum-izgara">
-            <div className="sunum-kart">
-              <div className="sunum-kart-sayi" style={{ color: "#7fd9a8" }}>{veri.yoklama.geldi}</div>
-              <div className="sunum-kart-etiket">Geldi</div>
-            </div>
-            <div className="sunum-kart">
-              <div className="sunum-kart-sayi" style={{ color: "#e3b972" }}>{veri.yoklama.izinli}</div>
-              <div className="sunum-kart-etiket">İzinli</div>
-            </div>
-            <div className="sunum-kart">
-              <div className="sunum-kart-sayi" style={{ color: "#e0776f" }}>{veri.yoklama.izinsiz}</div>
-              <div className="sunum-kart-etiket">İzinsiz</div>
-            </div>
-            {yoklamaOran !== null && (
-              <div className="sunum-kart">
-                <div className="sunum-kart-sayi">%{yoklamaOran}</div>
-                <div className="sunum-kart-etiket">Devam Oranı</div>
-              </div>
-            )}
+        <div className="sunum-izgara">
+          <div className="sunum-kart">
+            <div className="sunum-kart-sayi" style={{ color: "#7fd9a8" }}>{veri.yoklama.geldi}</div>
+            <div className="sunum-kart-etiket">Geldi</div>
           </div>
-        </>
-      )}
-
-      {veri.namaz && (
-        <>
-          <div className="sunum-bolum-baslik">Namaz Yoklama</div>
-          <div className="sunum-izgara">
-            <div className="sunum-kart">
-              <div className="sunum-kart-sayi" style={{ color: "#7fd9a8" }}>{veri.namaz.kildi}</div>
-              <div className="sunum-kart-etiket">Kıldı</div>
-            </div>
-            <div className="sunum-kart">
-              <div className="sunum-kart-sayi" style={{ color: "#e3b972" }}>{veri.namaz.gecKildi}</div>
-              <div className="sunum-kart-etiket">Geç Kıldı</div>
-            </div>
-            <div className="sunum-kart">
-              <div className="sunum-kart-sayi" style={{ color: "#6fb3d1" }}>{veri.namaz.izinli}</div>
-              <div className="sunum-kart-etiket">İzinli</div>
-            </div>
-            <div className="sunum-kart">
-              <div className="sunum-kart-sayi" style={{ color: "#e0776f" }}>{veri.namaz.kilmadi}</div>
-              <div className="sunum-kart-etiket">Kılmadı</div>
-            </div>
-            {namazOran !== null && (
-              <div className="sunum-kart">
-                <div className="sunum-kart-sayi">%{namazOran}</div>
-                <div className="sunum-kart-etiket">Kılma Oranı</div>
-              </div>
-            )}
+          <div className="sunum-kart">
+            <div className="sunum-kart-sayi" style={{ color: "#e3b972" }}>{veri.yoklama.izinli}</div>
+            <div className="sunum-kart-etiket">İzinli</div>
           </div>
-        </>
+          <div className="sunum-kart">
+            <div className="sunum-kart-sayi" style={{ color: "#e0776f" }}>{veri.yoklama.izinsiz}</div>
+            <div className="sunum-kart-etiket">İzinsiz</div>
+          </div>
+          {yoklamaOran !== null && (
+            <div className="sunum-kart">
+              <div className="sunum-kart-sayi">%{yoklamaOran}</div>
+              <div className="sunum-kart-etiket">Devam Oranı</div>
+            </div>
+          )}
+        </div>
       )}
 
       {veri.vazifeler.length > 0 && (
@@ -143,12 +163,12 @@ export default function SunumIstemci({ ilkVeri }) {
         </>
       )}
 
-      {!veri.yoklama && !veri.namaz && veri.vazifeler.length === 0 && (
+      {!veri.yoklama && veri.vazifeler.length === 0 && (
         <div className="sunum-bos">Gösterilecek modül verisi yok.</div>
       )}
 
       <div className="sunum-canli">
-        <span className="sunum-canli-nokta" /> Canlı — her 45 saniyede güncellenir
+        <span className="sunum-canli-nokta" /> Canlı — her 15 dakikada güncellenir
       </div>
     </div>
   );
