@@ -3,15 +3,17 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import CikisButonu from "./CikisButonu";
 import TemaDugmesi from "./TemaDugmesi";
+import { useSiteAyarlari } from "./SiteAyarlariProvider";
 
 export default function KabukNav({ modulLinkleri, istatistikVarMi, mesajVarMi, isAdmin, sahipAdi }) {
   const yol = usePathname();
+  const { siteAdi, logoUrl } = useSiteAyarlari();
 
   return (
     <aside className="yan-menu">
       <div className="logo-alan">
         <Link href="/">
-          <img src="/logo.png" alt="Yavuztürk Süleymaniye" />
+          <img src={logoUrl || "/logo.png"} alt={siteAdi} />
         </Link>
       </div>
       <nav>

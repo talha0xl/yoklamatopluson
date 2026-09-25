@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
+import { useSiteAyarlari } from "../../components/SiteAyarlariProvider";
 
 const GUNLER = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"];
 const AYLAR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
@@ -14,6 +15,7 @@ function tarihFormatla(d) {
 }
 
 export default function SunumIstemci({ ilkVeri }) {
+  const { siteAdi, logoUrl } = useSiteAyarlari();
   const [veri, setVeri] = useState(ilkVeri);
   const [saat, setSaat] = useState(null);
   const [tamEkran, setTamEkran] = useState(false);
@@ -84,8 +86,8 @@ export default function SunumIstemci({ ilkVeri }) {
     <div className="sunum-sayfa" ref={sarmalRef}>
       <div className="sunum-ust">
         <div className="sunum-org">
-          <img src="/logo.png" alt="Yavuztürk Süleymaniye" />
-          <div className="sunum-org-metin">Yavuztürk Süleymaniye</div>
+          <img src={logoUrl || "/logo.png"} alt={siteAdi} />
+          <div className="sunum-org-metin">{siteAdi}</div>
         </div>
         <div className="sunum-saat-blok">
           <div className="sunum-tarih">{saat ? tarihFormatla(saat) : ""}</div>

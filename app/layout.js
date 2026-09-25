@@ -1,14 +1,35 @@
 import "./globals.css";
 import AcilisEkrani from "../components/AcilisEkrani";
+import { SiteAyarlariProvider } from "../components/SiteAyarlariProvider";
+import { siteAyarlariGetir, koyulastir } from "../lib/siteAyarlari";
 
-export const metadata = {
-  title: "Yavuztürk Süleymaniye | Portal",
-  description: "Yurt yoklama, namaz yoklama, kitap takip ve görev listeleri — tek portal.",
-};
+// Site adı/logo/renk Supabase'den her istekte taze okunsun (Next.js'in
+// build-zamanı statik/cache'leme davranışına takılıp bir değişikliğin
+// yeniden deploy edilene kadar görünmemesi ihtimalini ortadan kaldırır).
+export const dynamic = "force-dynamic";
 
-export default function RootLayout({ children }) {
+export async function generateMetadata() {
+  const ayar = await siteAyarlariGetir("ana_portal");
+  return {
+    title: `${ayar.siteAdi} | Portal`,
+    description: "Yurt yoklama, namaz yoklama, kitap takip ve görev listeleri — tek portal.",
+  };
+}
+
+export default async function RootLayout({ children }) {
+  // Site Tasarımı sayfasından değiştirilen ad/logo/renk buradan (sunucuda,
+  // her istekte) okunuyor ve tüm siteye (giriş, kenar menü, sunum modu,
+  // açılış ekranı) yayılıyor — böylece bir değişiklik yeniden deploy
+  // gerektirmeden HERKESTE anında görünür.
+  const ayar = await siteAyarlariGetir("ana_portal");
+  const koyuRenk = koyulastir(ayar.anaRenk);
+
   return (
-    <html lang="tr" suppressHydrationWarning>
+    <html
+      lang="tr"
+      suppressHydrationWarning
+      style={{ "--lacivert": ayar.anaRenk, "--lacivert-koyu": koyuRenk }}
+    >
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="true" />
@@ -30,7 +51,9 @@ export default function RootLayout({ children }) {
         />
       </head>
       <body>
-        <AcilisEkrani>{children}</AcilisEkrani>
+        <SiteAyarlariProvider value={{ siteAdi: ayar.siteAdi, logoUrl: ayar.logoUrl }}>
+          <AcilisEkrani>{children}</AcilisEkrani>
+        </SiteAyarlariProvider>
       </body>
     </html>
   );

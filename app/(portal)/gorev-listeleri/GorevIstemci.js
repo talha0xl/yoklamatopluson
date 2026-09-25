@@ -159,8 +159,15 @@ function YonetimPaneli({ listeler, onDegisti }) {
   const [yeniKategoriAdi, setYeniKategoriAdi] = useState("");
   const [yeniListeAdi, setYeniListeAdi] = useState("");
   const [ekleniyor, setEkleniyor] = useState(false);
+  const [bugunAyarTarihi, setBugunAyarTarihi] = useState(bugunISO());
+  const [bugunAyarBirim, setBugunAyarBirim] = useState("");
 
   const seciliListe = listeler.find((l) => l.id === listeId);
+
+  const birimlerYonetim =
+    gruplar.length > 0
+      ? gruplar.map((g) => ({ id: g.id, isim: g.isim }))
+      : kisiler.map((k) => ({ id: k.id, isim: k.ad_soyad }));
 
   const getir = useCallback(() => {
     if (!listeId) return;
@@ -179,6 +186,10 @@ function YonetimPaneli({ listeler, onDegisti }) {
   useEffect(() => {
     if (!listeId && listeler.length) setListeId(listeler[0].id);
   }, [listeler, listeId]);
+  useEffect(() => {
+    setBugunAyarBirim("");
+    setBugunAyarTarihi(bugunISO());
+  }, [listeId]);
 
   async function kisiEkle(e) {
     e.preventDefault();
@@ -271,6 +282,17 @@ function YonetimPaneli({ listeler, onDegisti }) {
       body: JSON.stringify(alanlar),
     });
     onDegisti();
+  }
+
+  async function bugunSirayiAta() {
+    if (!seciliListe || bugunAyarBirim === "") return;
+    const index = parseInt(bugunAyarBirim, 10);
+    // rotasyon_baslangic'i, seçilen tarihte tam olarak seçilen birime denk
+    // gelecek şekilde geriye sarıyoruz (sirdakiOge bu tarihten itibaren gün
+    // farkına göre sırayı hesaplıyor) — sonraki günler otomatik sırayla devam eder.
+    const yeniBaslangic = tarihEkle(bugunAyarTarihi, -index);
+    await listeAyariGuncelle({ rotasyon_baslangic: yeniBaslangic });
+    setBugunAyarBirim("");
   }
 
   return (
@@ -380,15 +402,41 @@ function YonetimPaneli({ listeler, onDegisti }) {
                 <button className="btn btn-hayalet btn-sm" onClick={() => listeAyariGuncelle({ rotasyonlu: !seciliListe.rotasyonlu })}>
                   {seciliListe.rotasyonlu ? "Otomatik sıra: Açık — kapat" : "Otomatik sıra: Kapalı — aç"}
                 </button>
-                {seciliListe.rotasyonlu && (
-                  <button
-                    className="btn btn-hayalet btn-sm"
-                    style={{ marginTop: 8 }}
-                    onClick={() => listeAyariGuncelle({ rotasyon_baslangic: bugunISO() })}
-                    title="Kişi/grup listesi değiştiyse sırayı bugünden baştan başlatır"
-                  >
-                    Sırayı bugünden başlat
-                  </button>
+                {seciliListe.rotasyonlu && birimlerYonetim.length > 0 && (
+                  <div style={{ marginTop: 14 }}>
+                    <label className="etiket" style={{ marginBottom: 6, display: "block" }}>
+                      Bugün (ya da seçtiğiniz tarihte) kimin sırası — elle ayarla
+                    </label>
+                    <p style={{ fontSize: 12, color: "var(--metin-soluk)", marginTop: -2, marginBottom: 10 }}>
+                      Sistem daha başlamadıysa ya da sıra kaymışsa, o tarihte kimin/hangi grubun sırada olduğunu buradan
+                      seçin — sonraki günler oradan itibaren otomatik sırayla devam eder.
+                    </p>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                      <input
+                        type="date"
+                        className="girdi"
+                        style={{ width: 150 }}
+                        value={bugunAyarTarihi}
+                        onChange={(e) => setBugunAyarTarihi(e.target.value)}
+                      />
+                      <select
+                        className="girdi"
+                        style={{ width: 180 }}
+                        value={bugunAyarBirim}
+                        onChange={(e) => setBugunAyarBirim(e.target.value)}
+                      >
+                        <option value="">Kişi / grup seçin...</option>
+                        {birimlerYonetim.map((b, i) => (
+                          <option key={b.id} value={i}>
+                            {b.isim}
+                          </option>
+                        ))}
+                      </select>
+                      <button className="btn btn-lacivert btn-sm" disabled={bugunAyarBirim === ""} onClick={bugunSirayiAta}>
+                        Bu tarihte bunu ata
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
             )}

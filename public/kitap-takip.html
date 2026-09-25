@@ -1838,6 +1838,31 @@ const SPLASH_MIN_MS = 900;
 const splashImg = document.getElementById("splash-logo");
 if (splashImg && window.__LOGO_WHITE__) splashImg.src = window.__LOGO_WHITE__;
 
+// Ana portaldaki "Site Tasarımı" sayfasından değiştirilen ad/logo/ana renk
+// burada da (herkes için, tek seferde) uygulansın diye — anon key ile
+// sadece OKUMA yapılabiliyor (bkz. supabase_schema_v15_site_tasarim.sql).
+// Ağ isteği başarısız olursa ya da satır yoksa sessizce varsayılanlarla
+// devam eder, uygulamanın kendisini asla bloklamaz.
+(async function siteAyarlariniUygula() {
+  try {
+    if (!CONFIGURED) return;
+    const { data } = await sb.from("site_ayarlari").select("*").eq("site", "kitap_takip").maybeSingle();
+    if (!data) return;
+    if (data.logo_url && splashImg) splashImg.src = data.logo_url;
+    if (data.site_adi) {
+      document.title = data.site_adi;
+      if (splashImg) splashImg.alt = data.site_adi;
+    }
+    if (data.ana_renk) {
+      document.documentElement.style.setProperty("--brand-navy", data.ana_renk);
+      const geriBtn = document.getElementById("portal-geri-btn");
+      if (geriBtn) geriBtn.style.background = data.ana_renk;
+    }
+  } catch (e) {
+    // sessiz geç — Kitap Takip'in kendisi bundan etkilenmesin
+  }
+})();
+
 load();
 </script>
 </body>

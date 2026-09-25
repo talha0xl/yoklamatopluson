@@ -3,12 +3,28 @@ import path from "path";
 import PDFDocument from "pdfkit";
 import { supabaseServer } from "../../../../lib/supabaseServer";
 import { yoklamaNamazHesapla } from "../../../../lib/istatistikHesapla";
+import { siteAyarlariGetir } from "../../../../lib/siteAyarlari";
 
 export const runtime = "nodejs";
 
 const FONT_REGULAR = path.join(process.cwd(), "lib", "fonts", "DejaVuSans.ttf");
 const FONT_BOLD = path.join(process.cwd(), "lib", "fonts", "DejaVuSans-Bold.ttf");
-const LOGO = path.join(process.cwd(), "public", "logo.png");
+const LOGO_VARSAYILAN = path.join(process.cwd(), "public", "logo.png");
+
+// Site Tasarımı sayfasından özel bir logo yüklenmişse (data: URI olarak
+// saklanıyor) onu pdfkit'in kabul ettiği bir Buffer'a çevirir; yoksa
+// pakete gömülü varsayılan logo dosyasının yolunu döner.
+function pdfLogoKaynagi(logoUrl) {
+  if (logoUrl && logoUrl.startsWith("data:")) {
+    try {
+      const base64 = logoUrl.split(",")[1];
+      if (base64) return Buffer.from(base64, "base64");
+    } catch {
+      // biçim beklenmedikse varsayılana düş
+    }
+  }
+  return LOGO_VARSAYILAN;
+}
 
 const VAKIT_ETIKET = { sabah: "Sabah", ogle: "Öğle", ikindi: "İkindi", aksam: "Akşam", yatsi: "Yatsı" };
 
@@ -67,6 +83,8 @@ export async function GET(req) {
   }
 
   const baslik = kaynak === "namaz" ? "Namaz Yoklama Durumu" : "Yoklama Durumu";
+  const siteAyar = await siteAyarlariGetir("ana_portal");
+  const logoKaynagi = pdfLogoKaynagi(siteAyar.logoUrl);
 
   // PDF üretimi (pdfkit + gömülü font dosyaları) burada tek bir try/catch
   // içinde — sunucuda beklenmedik bir hata olursa (ör. font dosyası pakette
@@ -84,7 +102,7 @@ export async function GET(req) {
 
     sonuc.forEach((s, i) => {
       if (i > 0) doc.addPage();
-      sayfaCiz(doc, s, { grupAdi, turAdi, baslik, kaynak, baslangic, bitis });
+      sayfaCiz(doc, s, { grupAdi, turAdi, baslik, kaynak, baslangic, bitis, siteAdi: siteAyar.siteAdi, logoKaynagi });
     });
 
     doc.end();
@@ -107,18 +125,18 @@ export async function GET(req) {
   });
 }
 
-function sayfaCiz(doc, s, { grupAdi, turAdi, baslik, kaynak, baslangic, bitis }) {
+function sayfaCiz(doc, s, { grupAdi, turAdi, baslik, kaynak, baslangic, bitis, siteAdi, logoKaynagi }) {
   const solKenar = doc.page.margins.left;
   const genislik = doc.page.width - doc.page.margins.left - doc.page.margins.right;
 
   try {
-    doc.image(LOGO, solKenar, doc.y, { width: 150 });
+    doc.image(logoKaynagi || LOGO_VARSAYILAN, solKenar, doc.y, { width: 150 });
   } catch {
     // logo bulunamazsa sessizce geç, mektup yine de üretilsin
   }
   doc.moveDown(3.2);
 
-  doc.font("kalın").fontSize(16).fillColor("#1c2436").text("Yavuztürk Süleymaniye", solKenar, doc.y, { width: genislik });
+  doc.font("kalın").fontSize(16).fillColor("#1c2436").text(siteAdi || "Yavuztürk Süleymaniye", solKenar, doc.y, { width: genislik });
   doc.font("kalın").fontSize(13).fillColor("#28334a").text(baslik, { width: genislik });
   doc.moveDown(1);
 
@@ -185,6 +203,6 @@ function sayfaCiz(doc, s, { grupAdi, turAdi, baslik, kaynak, baslangic, bitis })
   doc.moveDown(1.5);
   doc.font("gövde").fontSize(10.5).fillColor("#202634").text("Bilgilerinize sunarız.", solKenar, doc.y, { width: genislik });
   doc.moveDown(0.3);
-  doc.font("kalın").fontSize(10.5).text("Yavuztürk Süleymaniye Yurdu Yönetimi", { width: genislik });
+  doc.font("kalın").fontSize(10.5).text(`${siteAdi || "Yavuztürk Süleymaniye"} Yurdu Yönetimi`, { width: genislik });
   doc.font("gövde").fontSize(9).fillColor("#6b7280").text(`Bu belge ${bugunUzun()} tarihinde otomatik olarak oluşturulmuştur.`, { width: genislik });
 }

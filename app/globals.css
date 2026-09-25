@@ -288,6 +288,7 @@ tr:last-child td { border-bottom: none; }
 
 .uyari { background: var(--uyari-bg); border: 1px solid var(--uyari-border); color: var(--uyari-metin); padding: 12px 16px; border-radius: 10px; font-size: 13.5px; }
 .hata { background: var(--hata-bg); border: 1px solid var(--hata-border); color: var(--kirmizi-metin); padding: 12px 16px; border-radius: 10px; font-size: 13.5px; }
+.basari { background: var(--rozet-yesil-bg); border: 1px solid var(--yesil); color: var(--yesil-metin); padding: 12px 16px; border-radius: 10px; font-size: 13.5px; }
 
 .bos-durum { text-align: center; padding: 60px 20px; color: var(--metin-soluk); }
 
